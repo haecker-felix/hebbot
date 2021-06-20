@@ -229,6 +229,7 @@ impl EventCallback {
         info!("Received command: {} ({})", command, args);
 
         match command {
+            "!status" => self.status_command().await,
             "!clear" => self.clear_command().await,
             "!help" => self.help_command().await,
             "!say" => self.say_command(&args).await,
@@ -240,10 +241,36 @@ impl EventCallback {
         let help = "Available commands: \n\n\
             !render-message \n\
             !render-file \n\
+            !status \n\
             !clear \n\
             !say <message>";
 
         self.0.send_message(help, true).await;
+    }
+
+    async fn status_command(&self) {
+        let msg = {
+            let news_store = self.0.news_store.lock().unwrap();
+            let news = news_store.get_news().clone();
+
+            let news_count = news.len();
+            let mut news_approved_count = 0;
+
+            for n in news {
+                if n.approved {
+                    news_approved_count += 1;
+                }
+            }
+
+            format!(
+                "Status: \n\n\
+                All news: {} \n\
+                Approved news: {}",
+                news_count, news_approved_count
+            )
+        };
+
+        self.0.send_message(&msg, true).await;
     }
 
     async fn clear_command(&self) {
