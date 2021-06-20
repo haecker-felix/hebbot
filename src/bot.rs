@@ -13,13 +13,17 @@ use ruma::RoomId;
 use ruma::UserId;
 
 use std::convert::TryFrom;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 use crate::config::Config;
+use crate::store::{News, NewsStore};
 use crate::utils;
 
 #[derive(Clone)]
 pub struct Bot {
     config: Config,
+    news_store: Arc<Mutex<NewsStore>>,
     client: Client,
     reporting_room: Joined,
     admin_room: Joined,
@@ -28,6 +32,7 @@ pub struct Bot {
 impl Bot {
     pub async fn run() {
         let config = Config::read();
+        let news_store = Arc::new(Mutex::new(NewsStore::read()));
 
         let username = config.bot_user_id.as_str();
         let user = UserId::try_from(username).expect("Unable to parse bot user id");
@@ -48,6 +53,7 @@ impl Bot {
 
         let bot = Self {
             config,
+            news_store,
             client,
             reporting_room,
             admin_room,
@@ -138,18 +144,37 @@ impl EventHandler for EventCallback {
 }
 
 impl EventCallback {
-    async fn on_reporting_room_msg(&self, msg: String, member: &RoomMember, event_id: &EventId) {
+    async fn on_reporting_room_msg(
+        &self,
+        message: String,
+        member: &RoomMember,
+        event_id: &EventId,
+    ) {
         // We're going to ignore all messages, expect it mentions the bot at the beginning
         let bot_id = self.0.client.user_id().await.unwrap();
-        if !utils::msg_starts_with_mention(bot_id, msg.clone()) {
+        if !utils::msg_starts_with_mention(bot_id, message.clone()) {
             return;
         }
 
-        let member_name = utils::get_member_display_name(&member);
-        debug!("received {:?} {:?}", msg, event_id.to_string());
+        let event_id = event_id.to_string();
+        let reporter_id = member.user_id().to_string();
+        let reporter_display_name = utils::get_member_display_name(&member);
 
-        let msg = format!("Hello {}, we received your message!", member_name);
+        let msg = format!(
+            "Thanks for the report {}, I'll store your update!",
+            reporter_display_name
+        );
         self.0.send_message(&msg, false).await;
+
+        let news = News {
+            event_id,
+            reporter_id,
+            reporter_display_name,
+            message,
+            ..Default::default()
+        };
+
+        self.0.news_store.lock().unwrap().add_news(news);
     }
 
     async fn on_reporting_room_reaction(
@@ -163,13 +188,15 @@ impl EventCallback {
             return;
         }
 
-        let member_name = utils::get_member_display_name(&member);
+        if emoji == &self.0.config.approval_emoji {
+            let member_name = utils::get_member_display_name(&member);
 
-        let msg = format!(
-            "Hello {}, we received your {} reaction!",
-            member_name, emoji
-        );
-        self.0.send_message(&msg, false).await;
+            let msg = format!(
+                "The news with the ID {} got approved by an editor!",
+                event_id.to_string()
+            );
+            self.0.send_message(&msg, true).await;
+        }
     }
 
     async fn on_admin_room_message(&self, msg: String, member: &RoomMember) {
@@ -197,6 +224,7 @@ impl EventCallback {
         info!("Received command: {} ({})", command, args);
 
         match command {
+            "!clear" => self.clear_command().await,
             "!help" => self.help_command().await,
             "!say" => self.say_command(&args).await,
             _ => self.unrecognized_command().await,
@@ -211,6 +239,19 @@ impl EventCallback {
             !say <message>";
 
         self.0.send_message(help, true).await;
+    }
+
+    async fn clear_command(&self) {
+        let msg = {
+            let mut news_store = self.0.news_store.lock().unwrap();
+
+            let news = news_store.get_news().clone();
+            news_store.clear_news();
+
+            format!("Cleared {} news!", news.len())
+        };
+
+        self.0.send_message(&msg, true).await;
     }
 
     async fn say_command(&self, msg: &str) {

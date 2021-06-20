@@ -3,6 +3,7 @@ extern crate log;
 
 mod bot;
 mod config;
+mod store;
 mod utils;
 
 #[tokio::main(flavor = "current_thread")]

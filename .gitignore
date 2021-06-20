@@ -1,3 +1,4 @@
 /target
 .buildconfig
 config.json
+store.json
