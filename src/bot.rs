@@ -17,6 +17,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use crate::config::Config;
+use crate::render;
 use crate::store::{News, NewsStore};
 use crate::utils;
 
@@ -86,8 +87,12 @@ impl Bot {
         );
     }
 
-    async fn send_message(&self, msg: &str, admin_room: bool) {
-        let content = AnyMessageEventContent::RoomMessage(MessageEventContent::text_plain(msg));
+    async fn send_message(&self, msg: &str, html: bool, admin_room: bool) {
+        let content = if html {
+            AnyMessageEventContent::RoomMessage(MessageEventContent::text_html(msg, msg))
+        } else {
+            AnyMessageEventContent::RoomMessage(MessageEventContent::text_plain(msg))
+        };
         let txn_id = Uuid::new_v4();
 
         let room = if admin_room {
@@ -164,7 +169,7 @@ impl EventCallback {
             "Thanks for the report {}, I'll store your update!",
             reporter_display_name
         );
-        self.0.send_message(&msg, false).await;
+        self.0.send_message(&msg, false, false).await;
 
         let news = News {
             event_id,
@@ -200,7 +205,7 @@ impl EventCallback {
                     format!("Approved news with event id {}!", event_id)
                 }
             };
-            self.0.send_message(&msg, true).await;
+            self.0.send_message(&msg, false, true).await;
         }
     }
 
@@ -213,7 +218,7 @@ impl EventCallback {
         // Check if the sender is a editor (= has the permission to use commands)
         if !self.is_editor(&member).await {
             let msg = "You don't have the permission to use commands.";
-            self.0.send_message(msg, true).await;
+            self.0.send_message(msg, false, true).await;
             return;
         }
 
@@ -229,6 +234,7 @@ impl EventCallback {
         info!("Received command: {} ({})", command, args);
 
         match command {
+            "!render-message" => self.render_message_command(member).await,
             "!status" => self.status_command().await,
             "!clear" => self.clear_command().await,
             "!help" => self.help_command().await,
@@ -245,7 +251,7 @@ impl EventCallback {
             !clear \n\
             !say <message>";
 
-        self.0.send_message(help, true).await;
+        self.0.send_message(help, false, true).await;
     }
 
     async fn status_command(&self) {
@@ -270,7 +276,21 @@ impl EventCallback {
             )
         };
 
-        self.0.send_message(&msg, true).await;
+        self.0.send_message(&msg, false, true).await;
+    }
+
+    async fn render_message_command(&self, editor: &RoomMember) {
+        let rendered = {
+            let news_store = self.0.news_store.lock().unwrap();
+            let news = news_store.get_news().clone();
+
+            let editor = utils::get_member_display_name(editor);
+            let r = render::render(news, editor);
+
+            format!("<pre><code>{}</code></pre>\n", r)
+        };
+
+        self.0.send_message(&rendered, true, true).await;
     }
 
     async fn clear_command(&self) {
@@ -283,16 +303,16 @@ impl EventCallback {
             format!("Cleared {} news!", news.len())
         };
 
-        self.0.send_message(&msg, true).await;
+        self.0.send_message(&msg, false, true).await;
     }
 
     async fn say_command(&self, msg: &str) {
-        self.0.send_message(&msg, false).await;
+        self.0.send_message(&msg, true, false).await;
     }
 
     async fn unrecognized_command(&self) {
         let msg = "Unrecognized command. Use !help to list available commands.";
-        self.0.send_message(msg, true).await;
+        self.0.send_message(msg, false, true).await;
     }
 
     async fn is_editor(&self, member: &RoomMember) -> bool {

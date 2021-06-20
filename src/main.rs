@@ -4,6 +4,7 @@ extern crate log;
 mod bot;
 mod config;
 mod error;
+mod render;
 mod store;
 mod utils;
 
