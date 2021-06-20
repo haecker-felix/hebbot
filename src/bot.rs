@@ -6,6 +6,7 @@ use matrix_sdk::EventHandler;
 use matrix_sdk::RoomMember;
 use matrix_sdk::SyncSettings;
 use matrix_sdk_common::uuid::Uuid;
+use ruma::events::reaction::ReactionEventContent;
 use ruma::events::SyncMessageEvent;
 use ruma::EventId;
 use ruma::RoomId;
@@ -101,7 +102,8 @@ struct EventCallback(Bot);
 impl EventHandler for EventCallback {
     async fn on_room_message(&self, room: Room, event: &SyncMessageEvent<MessageEventContent>) {
         if let Room::Joined(ref _joined) = room {
-            if let Some(text) = utils::get_text_msg_body(event) {
+            // Standard text message
+            if let Some(text) = utils::get_message_event_text(event) {
                 let member = utils::get_msg_sender(&room, event).await;
 
                 // Reporting room
@@ -109,9 +111,26 @@ impl EventHandler for EventCallback {
                     let id = &event.event_id;
                     self.on_reporting_room_msg(text.clone(), &member, id).await;
                 }
+
                 // Admin room
                 if room.room_id() == self.0.admin_room.room_id() {
                     self.on_admin_room_message(text, &member).await;
+                }
+            }
+        }
+    }
+
+    async fn on_room_reaction(&self, room: Room, event: &SyncMessageEvent<ReactionEventContent>) {
+        if let Room::Joined(ref _joined) = room {
+            // Standard text message
+            if let Some(reaction_relation) = utils::get_message_event_reaction(event) {
+                let member = utils::get_msg_sender(&room, event).await;
+
+                // Reporting room
+                if room.room_id() == self.0.reporting_room.room_id() {
+                    let id = &reaction_relation.event_id;
+                    let emoji = &reaction_relation.emoji;
+                    self.on_reporting_room_reaction(&member, emoji, id).await;
                 }
             }
         }
@@ -129,7 +148,27 @@ impl EventCallback {
         let member_name = utils::get_member_display_name(&member);
         debug!("received {:?} {:?}", msg, event_id.to_string());
 
-        let msg = format!("Hello {} I received your message!", member_name);
+        let msg = format!("Hello {}, we received your message!", member_name);
+        self.0.send_message(&msg, false).await;
+    }
+
+    async fn on_reporting_room_reaction(
+        &self,
+        member: &RoomMember,
+        emoji: &String,
+        event_id: &EventId,
+    ) {
+        // Check if the sender is a editor (= has the permission to use emoji commands)
+        if !self.is_editor(&member).await {
+            return;
+        }
+
+        let member_name = utils::get_member_display_name(&member);
+
+        let msg = format!(
+            "Hello {}, we received your {} reaction!",
+            member_name, emoji
+        );
         self.0.send_message(&msg, false).await;
     }
 
@@ -140,8 +179,7 @@ impl EventCallback {
         }
 
         // Check if the sender is a editor (= has the permission to use commands)
-        let user_id = member.user_id().to_string();
-        if !self.0.config.editors.contains(&user_id) {
+        if !self.is_editor(&member).await {
             let msg = "You don't have the permission to use commands.";
             self.0.send_message(msg, true).await;
             return;
@@ -182,5 +220,10 @@ impl EventCallback {
     async fn unrecognized_command(&self) {
         let msg = "Unrecognized command. Use !help to list available commands.";
         self.0.send_message(msg, true).await;
+    }
+
+    async fn is_editor(&self, member: &RoomMember) -> bool {
+        let user_id = member.user_id().to_string();
+        self.0.config.editors.contains(&user_id)
     }
 }

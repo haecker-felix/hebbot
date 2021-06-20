@@ -2,13 +2,15 @@ use matrix_sdk::events::room::message::MessageEventContent;
 use matrix_sdk::room::Room;
 use matrix_sdk::BaseRoomMember;
 use matrix_sdk::RoomMember;
+use ruma::events::reaction::ReactionEventContent;
+use ruma::events::reaction::Relation;
 use ruma::events::room::message::MessageType;
 use ruma::events::room::message::TextMessageEventContent;
 use ruma::events::SyncMessageEvent;
 use ruma::UserId;
 
-/// A simplified way of getting a the acutal message from text message event
-pub fn get_text_msg_body(event: &SyncMessageEvent<MessageEventContent>) -> Option<String> {
+/// A simplified way of getting the text from a message event
+pub fn get_message_event_text(event: &SyncMessageEvent<MessageEventContent>) -> Option<String> {
     if let SyncMessageEvent {
         content:
             MessageEventContent {
@@ -23,10 +25,24 @@ pub fn get_text_msg_body(event: &SyncMessageEvent<MessageEventContent>) -> Optio
     None
 }
 
+/// A simplified way of getting the reaction from a message event
+pub fn get_message_event_reaction(
+    event: &SyncMessageEvent<ReactionEventContent>,
+) -> Option<Relation> {
+    if let SyncMessageEvent {
+        content: ReactionEventContent { relation, .. },
+        ..
+    } = event
+    {
+        return Some(relation.to_owned());
+    }
+    None
+}
+
 /// Gets the sender RoomMember from a message event
-pub async fn get_msg_sender(
+pub async fn get_msg_sender<T: ruma::events::MessageEventContent>(
     room: &Room,
-    event: &SyncMessageEvent<MessageEventContent>,
+    event: &SyncMessageEvent<T>,
 ) -> RoomMember {
     room.get_member(&event.sender).await.unwrap().unwrap()
 }

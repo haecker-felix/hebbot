@@ -984,7 +984,7 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 [[package]]
 name = "matrix-qrcode"
 version = "0.1.0"
-source = "git+https://github.com/matrix-org/matrix-rust-sdk/#0fb3dedd1cd3b0766fa7378754480d52d38e8ef2"
+source = "git+https://github.com/matrix-org/matrix-rust-sdk/#bdd35206e8c92aea54285d1b89be9d5e9a49d56f"
 dependencies = [
  "base64",
  "byteorder",
@@ -998,7 +998,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk"
 version = "0.2.0"
-source = "git+https://github.com/matrix-org/matrix-rust-sdk/#0fb3dedd1cd3b0766fa7378754480d52d38e8ef2"
+source = "git+https://github.com/matrix-org/matrix-rust-sdk/#bdd35206e8c92aea54285d1b89be9d5e9a49d56f"
 dependencies = [
  "backoff",
  "bytes",
@@ -1023,7 +1023,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-base"
 version = "0.2.0"
-source = "git+https://github.com/matrix-org/matrix-rust-sdk/#0fb3dedd1cd3b0766fa7378754480d52d38e8ef2"
+source = "git+https://github.com/matrix-org/matrix-rust-sdk/#bdd35206e8c92aea54285d1b89be9d5e9a49d56f"
 dependencies = [
  "chacha20poly1305",
  "dashmap",
@@ -1064,7 +1064,7 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-crypto"
 version = "0.2.0"
-source = "git+https://github.com/matrix-org/matrix-rust-sdk/#0fb3dedd1cd3b0766fa7378754480d52d38e8ef2"
+source = "git+https://github.com/matrix-org/matrix-rust-sdk/#bdd35206e8c92aea54285d1b89be9d5e9a49d56f"
 dependencies = [
  "aes-ctr",
  "aes-gcm",
