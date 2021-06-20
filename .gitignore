@@ -2,3 +2,4 @@
 .buildconfig
 config.json
 store.json
+backup.json

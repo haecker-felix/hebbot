@@ -6,13 +6,15 @@ use std::fs;
 use std::fs::File;
 use std::io::Read;
 
+use crate::error::Error;
+
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct News {
     pub event_id: String,
     pub reporter_id: String,
     pub reporter_display_name: String,
     pub message: String,
-    pub approval_count: u32,
+    pub approved: bool,
 }
 
 #[derive(Clone)]
@@ -22,14 +24,17 @@ pub struct NewsStore {
 
 impl NewsStore {
     pub fn read() -> Self {
+        // Try to open+read store.json
         let path = Self::get_path();
-        let mut file = File::open(path).expect("Unable to open news store file");
-        let mut data = String::new();
-        file.read_to_string(&mut data)
-            .expect("Unable to read news store file");
-
-        let news_map: HashMap<String, News> =
-            serde_json::from_str(&data).expect("Unable to parse news store file");
+        let news_map: HashMap<String, News> = if let Ok(mut file) = File::open(path) {
+            let mut data = String::new();
+            file.read_to_string(&mut data)
+                .expect("Unable to read news store file");
+            serde_json::from_str(&data).expect("Unable to parse news store file")
+        } else {
+            warn!("Unable to open news store file");
+            HashMap::new()
+        };
 
         Self { news_map }
     }
@@ -39,6 +44,19 @@ impl NewsStore {
 
         self.news_map.insert(news.event_id.clone(), news);
         self.write_data();
+    }
+
+    pub fn approve_news(&mut self, event_id: &String) -> Result<(), Error> {
+        if let Some(news) = self.news_map.get(event_id) {
+            let mut new_news = news.clone();
+            new_news.approved = true;
+            self.news_map.insert(event_id.clone(), new_news);
+            self.write_data();
+            Ok(())
+        } else {
+            warn!("Cannot approve news, event_id not found");
+            Err(Error::NewsEventIdNotFound)
+        }
     }
 
     pub fn get_news(&self) -> Vec<News> {

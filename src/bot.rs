@@ -189,12 +189,17 @@ impl EventCallback {
         }
 
         if emoji == &self.0.config.approval_emoji {
-            let member_name = utils::get_member_display_name(&member);
-
-            let msg = format!(
-                "The news with the ID {} got approved by an editor!",
-                event_id.to_string()
-            );
+            let event_id = event_id.to_string();
+            let msg = {
+                if let Err(err) = self.0.news_store.lock().unwrap().approve_news(&event_id) {
+                    format!(
+                        "Unable to approve news with event id {}: {:?}",
+                        event_id, err
+                    )
+                } else {
+                    format!("Approved news with event id {}!", event_id)
+                }
+            };
             self.0.send_message(&msg, true).await;
         }
     }
