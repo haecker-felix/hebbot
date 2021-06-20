@@ -134,11 +134,20 @@ impl EventCallback {
     }
 
     async fn on_admin_room_message(&self, msg: String, member: &RoomMember) {
+        // Check if the message is a command
         if !msg.as_str().starts_with("!") {
             return;
         }
 
-        // Parse command, and optional args
+        // Check if the sender is a editor (= has the permission to use commands)
+        let user_id = member.user_id().to_string();
+        if !self.0.config.editors.contains(&user_id) {
+            let msg = "You don't have the permission to use commands.";
+            self.0.send_message(msg, true).await;
+            return;
+        }
+
+        // Parse command and optional args
         let mut split: Vec<&str> = msg.splitn(2, " ").collect();
         let args = if split.len() == 2 {
             split.pop().unwrap()
