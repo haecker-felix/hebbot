@@ -106,12 +106,12 @@ impl EventHandler for EventCallback {
 
                 // Reporting room
                 if room.room_id() == self.0.reporting_room.room_id() {
-                    self.on_reporting_room_message(text, member, &event.event_id)
-                        .await;
+                    let id = &event.event_id;
+                    self.on_reporting_room_msg(text.clone(), &member, id).await;
                 }
                 // Admin room
                 if room.room_id() == self.0.admin_room.room_id() {
-                    //self.on_admin_room_message(text);
+                    self.on_admin_room_message(text, &member).await;
                 }
             }
         }
@@ -119,7 +119,7 @@ impl EventHandler for EventCallback {
 }
 
 impl EventCallback {
-    async fn on_reporting_room_message(&self, msg: String, member: RoomMember, event_id: &EventId) {
+    async fn on_reporting_room_msg(&self, msg: String, member: &RoomMember, event_id: &EventId) {
         // We're going to ignore all messages, expect it mentions the bot at the beginning
         let bot_id = self.0.client.user_id().await.unwrap();
         if !utils::msg_starts_with_mention(bot_id, msg.clone()) {
@@ -131,5 +131,47 @@ impl EventCallback {
 
         let msg = format!("Hello {} I received your message!", member_name);
         self.0.send_message(&msg, false).await;
+    }
+
+    async fn on_admin_room_message(&self, msg: String, member: &RoomMember) {
+        if !msg.as_str().starts_with("!") {
+            return;
+        }
+
+        // Parse command, and optional args
+        let mut split: Vec<&str> = msg.splitn(2, " ").collect();
+        let args = if split.len() == 2 {
+            split.pop().unwrap()
+        } else {
+            ""
+        };
+        let command = split.pop().unwrap_or("");
+
+        info!("Received command: {} ({})", command, args);
+
+        match command {
+            "!help" => self.help_command().await,
+            "!say" => self.say_command(&args).await,
+            _ => self.unrecognized_command().await,
+        }
+    }
+
+    async fn help_command(&self) {
+        let help = "Available commands: \n\n\
+            !render-message \n\
+            !render-file \n\
+            !clear \n\
+            !say <message>";
+
+        self.0.send_message(help, true).await;
+    }
+
+    async fn say_command(&self, msg: &str) {
+        self.0.send_message(&msg, false).await;
+    }
+
+    async fn unrecognized_command(&self) {
+        let msg = "Unrecognized command. Use !help to list available commands.";
+        self.0.send_message(msg, true).await;
     }
 }
