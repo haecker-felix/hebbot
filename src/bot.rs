@@ -281,11 +281,12 @@ impl EventCallback {
 
     async fn render_message_command(&self, editor: &RoomMember) {
         let rendered = {
+            let bot = self.0.client.user_id().await.unwrap();
+
             let news_store = self.0.news_store.lock().unwrap();
             let news = news_store.get_news().clone();
 
-            let editor = utils::get_member_display_name(editor);
-            let r = render::render(news, editor);
+            let r = render::render(news, editor, &bot);
 
             format!("<pre><code>{}</code></pre>\n", r)
         };
