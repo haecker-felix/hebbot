@@ -7,6 +7,7 @@ use matrix_sdk::RoomMember;
 use matrix_sdk::SyncSettings;
 use matrix_sdk_common::uuid::Uuid;
 use ruma::events::reaction::ReactionEventContent;
+use ruma::events::room::redaction::SyncRedactionEvent;
 use ruma::events::SyncMessageEvent;
 use ruma::EventId;
 use ruma::RoomId;
@@ -115,7 +116,7 @@ impl EventHandler for EventCallback {
         if let Room::Joined(ref _joined) = room {
             // Standard text message
             if let Some(text) = utils::get_message_event_text(event) {
-                let member = utils::get_msg_sender(&room, event).await;
+                let member = room.get_member(&event.sender).await.unwrap().unwrap();
 
                 // Reporting room
                 if room.room_id() == self.0.reporting_room.room_id() {
@@ -132,17 +133,37 @@ impl EventHandler for EventCallback {
     }
 
     async fn on_room_reaction(&self, room: Room, event: &SyncMessageEvent<ReactionEventContent>) {
+        //dbg!(&event);
         if let Room::Joined(ref _joined) = room {
-            // Standard text message
-            if let Some(reaction_relation) = utils::get_message_event_reaction(event) {
-                let member = utils::get_msg_sender(&room, event).await;
+            let relation = &event.content.relation;
+            let reaction_event_id = event.event_id.clone();
+            let message_event_id = relation.event_id.clone();
+            let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
 
-                // Reporting room
-                if room.room_id() == self.0.reporting_room.room_id() {
-                    let id = &reaction_relation.event_id;
-                    let emoji = &reaction_relation.emoji;
-                    self.on_reporting_room_reaction(&member, emoji, id).await;
-                }
+            // Reporting room
+            if room.room_id() == self.0.reporting_room.room_id() {
+                let emoji = &relation.emoji;
+                self.on_reporting_room_reaction(
+                    &reaction_sender,
+                    emoji,
+                    &message_event_id,
+                    &reaction_event_id,
+                )
+                .await;
+            }
+        }
+    }
+
+    async fn on_room_redaction(&self, room: Room, event: &SyncRedactionEvent) {
+        //dbg!(&event);
+        if let Room::Joined(ref _joined) = room {
+            let redacted_event_id = event.redacts.clone();
+            let member = room.get_member(&event.sender).await.unwrap().unwrap();
+
+            // Reporting room
+            if room.room_id() == self.0.reporting_room.room_id() {
+                self.on_reporting_room_redaction(&member, &redacted_event_id)
+                    .await;
             }
         }
     }
@@ -184,27 +205,74 @@ impl EventCallback {
 
     async fn on_reporting_room_reaction(
         &self,
-        member: &RoomMember,
-        emoji: &String,
-        event_id: &EventId,
+        reaction_sender: &RoomMember,
+        reaction_emoji: &String,
+        message_event_id: &EventId,
+        reaction_event_id: &EventId,
     ) {
+        // Check if the sender is a editor (= has the permission to use emoji commands)
+        if !self.is_editor(&reaction_sender).await {
+            return;
+        }
+
+        let approval_emoji = &self.0.config.approval_emoji;
+        if reaction_emoji == approval_emoji {
+            let message_event_id = message_event_id.to_string();
+            let reaction_event_id = reaction_event_id.to_string();
+
+            let msg = {
+                let mut news_store = self.0.news_store.lock().unwrap();
+                match news_store.approve_news(&message_event_id, &reaction_event_id) {
+                    Ok(news) => format!(
+                        "Editor {} approved {}'s news entry (ID {})",
+                        reaction_sender.user_id().to_string(),
+                        news.reporter_id,
+                        message_event_id
+                    ),
+                    Err(err) => format!(
+                        "Unable to add {}'s news approval (ID {}): {:?}",
+                        reaction_sender.user_id().to_string(),
+                        message_event_id,
+                        err
+                    ),
+                }
+            };
+            self.0.send_message(&msg, false, true).await;
+        } else {
+            debug!(
+                "Ignore emoji reaction, doesn't match approval emoji ({} vs. {})",
+                approval_emoji, reaction_emoji
+            );
+        }
+    }
+
+    async fn on_reporting_room_redaction(&self, member: &RoomMember, redacted_event_id: &EventId) {
         // Check if the sender is a editor (= has the permission to use emoji commands)
         if !self.is_editor(&member).await {
             return;
         }
 
-        if emoji == &self.0.config.approval_emoji {
-            let event_id = event_id.to_string();
-            let msg = {
-                if let Err(err) = self.0.news_store.lock().unwrap().approve_news(&event_id) {
-                    format!(
-                        "Unable to approve news with event id {}: {:?}",
-                        event_id, err
-                    )
-                } else {
-                    format!("Approved news with event id {}!", event_id)
+        let msg = {
+            let mut news_store = self.0.news_store.lock().unwrap();
+            if let Ok(news) = news_store.unapprove_news(&redacted_event_id.to_string()) {
+                let mut msg = format!(
+                    "Editor {} removed their approval from {}'s news entry (ID {}).",
+                    member.user_id().to_string(),
+                    news.reporter_id,
+                    news.event_id
+                );
+
+                if news.approvals.is_empty() {
+                    msg = msg + " This news entry doesn't have an approval anymore."
                 }
-            };
+
+                Some(msg)
+            } else {
+                None
+            }
+        };
+
+        if let Some(msg) = msg {
             self.0.send_message(&msg, false, true).await;
         }
     }
@@ -263,7 +331,7 @@ impl EventCallback {
             let mut news_approved_count = 0;
 
             for n in news {
-                if n.approved {
+                if !n.approvals.is_empty() {
                     news_approved_count += 1;
                 }
             }

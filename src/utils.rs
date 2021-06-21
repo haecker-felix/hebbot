@@ -1,9 +1,5 @@
 use matrix_sdk::events::room::message::MessageEventContent;
-use matrix_sdk::room::Room;
 use matrix_sdk::BaseRoomMember;
-use matrix_sdk::RoomMember;
-use ruma::events::reaction::ReactionEventContent;
-use ruma::events::reaction::Relation;
 use ruma::events::room::message::MessageType;
 use ruma::events::room::message::TextMessageEventContent;
 use ruma::events::SyncMessageEvent;
@@ -23,28 +19,6 @@ pub fn get_message_event_text(event: &SyncMessageEvent<MessageEventContent>) -> 
         return Some(msg_body.to_owned());
     }
     None
-}
-
-/// A simplified way of getting the reaction from a message event
-pub fn get_message_event_reaction(
-    event: &SyncMessageEvent<ReactionEventContent>,
-) -> Option<Relation> {
-    if let SyncMessageEvent {
-        content: ReactionEventContent { relation, .. },
-        ..
-    } = event
-    {
-        return Some(relation.to_owned());
-    }
-    None
-}
-
-/// Gets the sender RoomMember from a message event
-pub async fn get_msg_sender<T: ruma::events::MessageEventContent>(
-    room: &Room,
-    event: &SyncMessageEvent<T>,
-) -> RoomMember {
-    room.get_member(&event.sender).await.unwrap().unwrap()
 }
 
 /// Gets display name for a RoomMember

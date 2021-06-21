@@ -14,7 +14,7 @@ pub struct News {
     pub reporter_id: String,
     pub reporter_display_name: String,
     pub message: String,
-    pub approved: bool,
+    pub approvals: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -46,17 +46,50 @@ impl NewsStore {
         self.write_data();
     }
 
-    pub fn approve_news(&mut self, event_id: &String) -> Result<(), Error> {
-        if let Some(news) = self.news_map.get(event_id) {
-            let mut new_news = news.clone();
-            new_news.approved = true;
-            self.news_map.insert(event_id.clone(), new_news);
+    /// Tries to add an news approval
+    /// Returns news entry when approval got successfully added
+    pub fn approve_news(
+        &mut self,
+        news_event_id: &String,
+        reaction_event_id: &String,
+    ) -> Result<News, Error> {
+        if let Some(news) = self.news_map.get(news_event_id) {
+            let mut updated_news = news.clone();
+            updated_news
+                .approvals
+                .insert(0, reaction_event_id.to_string());
+            self.news_map
+                .insert(news_event_id.clone(), updated_news.clone());
             self.write_data();
-            Ok(())
+            Ok(updated_news)
         } else {
             warn!("Cannot approve news, event_id not found");
             Err(Error::NewsEventIdNotFound)
         }
+    }
+
+    /// Tries to remove an news approval
+    /// Returns news entry when approval got successfully removed
+    pub fn unapprove_news(&mut self, redacted_event_id: &String) -> Result<News, Error> {
+        // Check if we have a news approval with a matching reaction event_id (=redacted_event_id)
+        for n in self.news_map.values() {
+            for (i, approval) in n.approvals.iter().enumerate() {
+                if approval == redacted_event_id {
+                    let mut updated_news = n.clone();
+                    updated_news.approvals.remove(i);
+                    self.news_map
+                        .insert(updated_news.event_id.clone(), updated_news.clone());
+                    self.write_data();
+                    return Ok(updated_news);
+                }
+            }
+        }
+
+        warn!(
+            "Cannot unapprove news, no reaction id {} found",
+            redacted_event_id
+        );
+        Err(Error::ApprovalReactionIdNotFound)
     }
 
     pub fn get_news(&self) -> Vec<News> {

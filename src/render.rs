@@ -23,7 +23,7 @@ pub fn render(news: Vec<News>, editor: &RoomMember, bot: &UserId) -> String {
     let mut report = String::new();
     for n in news {
         // skip not approved news
-        if !n.approved {
+        if n.approvals.is_empty() {
             continue;
         }
 
