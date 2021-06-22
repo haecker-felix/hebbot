@@ -6,7 +6,6 @@ use matrix_sdk::EventHandler;
 use matrix_sdk::RoomMember;
 use matrix_sdk::SyncSettings;
 use matrix_sdk_common::uuid::Uuid;
-use regex::Regex;
 use ruma::events::reaction::ReactionEventContent;
 use ruma::events::room::redaction::SyncRedactionEvent;
 use ruma::events::SyncMessageEvent;
@@ -210,7 +209,7 @@ impl EventCallback {
     async fn on_reporting_room_reaction(
         &self,
         reaction_sender: &RoomMember,
-        reaction_emoji: &String,
+        reaction_emoji: &str,
         message_event_id: &EventId,
         reaction_event_id: &EventId,
     ) {
@@ -220,7 +219,7 @@ impl EventCallback {
         }
 
         let approval_emoji = &self.0.config.approval_emoji;
-        if reaction_emoji == &approval_emoji.to_string() {
+        if reaction_emoji == approval_emoji.to_string() {
             let message_event_id = message_event_id.to_string();
             let reaction_event_id = reaction_event_id.to_string();
 
@@ -267,7 +266,7 @@ impl EventCallback {
                 );
 
                 if news.approvals.is_empty() {
-                    msg = msg + " This news entry doesn't have an approval anymore."
+                    msg += " This news entry doesn't have an approval anymore."
                 }
 
                 Some(msg)
@@ -283,7 +282,7 @@ impl EventCallback {
 
     async fn on_admin_room_message(&self, msg: String, member: &RoomMember) {
         // Check if the message is a command
-        if !msg.as_str().starts_with("!") {
+        if !msg.as_str().starts_with('!') {
             return;
         }
 
@@ -295,7 +294,7 @@ impl EventCallback {
         }
 
         // Parse command and optional args
-        let mut split: Vec<&str> = msg.splitn(2, " ").collect();
+        let mut split: Vec<&str> = msg.splitn(2, ' ').collect();
         let args = if split.len() == 2 {
             split.pop().unwrap()
         } else {
@@ -329,7 +328,7 @@ impl EventCallback {
     async fn status_command(&self) {
         let msg = {
             let news_store = self.0.news_store.lock().unwrap();
-            let news = news_store.get_news().clone();
+            let news = news_store.get_news();
 
             let news_count = news.len();
             let mut news_approved_count = 0;
@@ -356,7 +355,7 @@ impl EventCallback {
             let bot = self.0.client.user_id().await.unwrap();
 
             let news_store = self.0.news_store.lock().unwrap();
-            let news = news_store.get_news().clone();
+            let news = news_store.get_news();
 
             let r = render::render(news, editor, &bot);
 
@@ -370,7 +369,7 @@ impl EventCallback {
         let msg = {
             let mut news_store = self.0.news_store.lock().unwrap();
 
-            let news = news_store.get_news().clone();
+            let news = news_store.get_news();
             news_store.clear_news();
 
             format!("Cleared {} news!", news.len())

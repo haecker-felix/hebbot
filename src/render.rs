@@ -78,7 +78,5 @@ fn prepare_message(msg: String, bot: &UserId) -> String {
     let msg = msg.replace("\n", "\n> ");
 
     // lists
-    let msg = msg.replace("> -", "> *");
-
-    msg.to_string()
+    msg.replace("> -", "> *")
 }

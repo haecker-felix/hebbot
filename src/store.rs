@@ -50,8 +50,8 @@ impl NewsStore {
     /// Returns news entry when approval got successfully added
     pub fn approve_news(
         &mut self,
-        news_event_id: &String,
-        reaction_event_id: &String,
+        news_event_id: &str,
+        reaction_event_id: &str,
     ) -> Result<News, Error> {
         if let Some(news) = self.news_map.get(news_event_id) {
             let mut updated_news = news.clone();
@@ -59,7 +59,7 @@ impl NewsStore {
                 .approvals
                 .insert(0, reaction_event_id.to_string());
             self.news_map
-                .insert(news_event_id.clone(), updated_news.clone());
+                .insert(news_event_id.to_string(), updated_news.clone());
             self.write_data();
             Ok(updated_news)
         } else {
@@ -70,7 +70,7 @@ impl NewsStore {
 
     /// Tries to remove an news approval
     /// Returns news entry when approval got successfully removed
-    pub fn unapprove_news(&mut self, redacted_event_id: &String) -> Result<News, Error> {
+    pub fn unapprove_news(&mut self, redacted_event_id: &str) -> Result<News, Error> {
         // Check if we have a news approval with a matching reaction event_id (=redacted_event_id)
         for n in self.news_map.values() {
             for (i, approval) in n.approvals.iter().enumerate() {
@@ -93,7 +93,7 @@ impl NewsStore {
     }
 
     pub fn get_news(&self) -> Vec<News> {
-        self.news_map.values().map(|n| n.clone()).collect()
+        self.news_map.values().cloned().collect()
     }
 
     pub fn clear_news(&mut self) {
