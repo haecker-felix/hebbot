@@ -4,7 +4,7 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct Config {
     pub bot_user_id: String,
     pub bot_password: String,

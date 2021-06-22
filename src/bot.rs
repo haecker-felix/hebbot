@@ -62,6 +62,8 @@ impl Bot {
         };
 
         //bot.send_message("Started hebbot service!", true).await;
+
+        // Setup event handler
         let handler = Box::new(EventCallback(bot.clone()));
         bot.client.set_event_handler(handler).await;
 
@@ -69,6 +71,7 @@ impl Bot {
         bot.client.sync(SyncSettings::new()).await;
     }
 
+    /// Login
     async fn login(client: &Client, user: &str, pwd: &str) {
         info!("Logging in...");
         let response = client
@@ -88,7 +91,13 @@ impl Bot {
         );
     }
 
+    /// Simplified method for sending a matrix text/html message
     async fn send_message(&self, msg: &str, html: bool, admin_room: bool) {
+        debug!(
+            "Send message (html: {:?}, admin-room: {:?}): {}",
+            html, admin_room, msg
+        );
+
         let content = if html {
             AnyMessageEventContent::RoomMessage(MessageEventContent::text_html(msg, msg))
         } else {
@@ -108,19 +117,20 @@ impl Bot {
     }
 }
 
+// Setup EventHandler to handle incoming matrix events
 struct EventCallback(Bot);
 
 #[async_trait::async_trait]
 impl EventHandler for EventCallback {
+    /// Handling room messages events
     async fn on_room_message(&self, room: Room, event: &SyncMessageEvent<MessageEventContent>) {
         if let Room::Joined(ref _joined) = room {
-            // Standard text message
             if let Some(text) = utils::get_message_event_text(event) {
                 let member = room.get_member(&event.sender).await.unwrap().unwrap();
+                let id = &event.event_id;
 
                 // Reporting room
                 if room.room_id() == self.0.reporting_room.room_id() {
-                    let id = &event.event_id;
                     self.on_reporting_room_msg(text.clone(), &member, id).await;
                 }
 
@@ -132,20 +142,19 @@ impl EventHandler for EventCallback {
         }
     }
 
+    /// Handling room reaction events
     async fn on_room_reaction(&self, room: Room, event: &SyncMessageEvent<ReactionEventContent>) {
-        //dbg!(&event);
         if let Room::Joined(ref _joined) = room {
+            let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
             let relation = &event.content.relation;
             let reaction_event_id = event.event_id.clone();
             let message_event_id = relation.event_id.clone();
-            let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
+
+            // Remove emoji variant form
+            let emoji = &relation.emoji.replace("\u{fe0f}", "");
 
             // Reporting room
             if room.room_id() == self.0.reporting_room.room_id() {
-                let emoji = &relation.emoji;
-                // Remove emoji variant form
-                let emoji = emoji.replace("\u{fe0f}", "");
-
                 self.on_reporting_room_reaction(
                     &reaction_sender,
                     &emoji,
@@ -157,8 +166,8 @@ impl EventHandler for EventCallback {
         }
     }
 
+    /// Handling room redaction events (= something got removed/reverted)
     async fn on_room_redaction(&self, room: Room, event: &SyncRedactionEvent) {
-        //dbg!(&event);
         if let Room::Joined(ref _joined) = room {
             let redacted_event_id = event.redacts.clone();
             let member = room.get_member(&event.sender).await.unwrap().unwrap();
@@ -173,6 +182,9 @@ impl EventHandler for EventCallback {
 }
 
 impl EventCallback {
+    /// New message in reporting room
+    /// - When the bot gets mentioned at the beginning of the message,
+    ///   the message will get stored as News in NewsStore
     async fn on_reporting_room_msg(
         &self,
         message: String,
@@ -195,6 +207,7 @@ impl EventCallback {
         );
         self.0.send_message(&msg, false, false).await;
 
+        // Create new news entry...
         let news = News {
             event_id,
             reporter_id,
@@ -203,9 +216,15 @@ impl EventCallback {
             ..Default::default()
         };
 
+        // ...and save it for the next report!
         self.0.news_store.lock().unwrap().add_news(news);
     }
 
+    /// New emoji reaction in reporting room
+    /// - Only reactions from editors are processed
+    /// - "approval emoji" -> approve a news entry
+    /// - "section emoji" -> add a news entry to a section (eg. "Interesting Projects")
+    /// - "project emoji" -> add a project description to a news entry
     async fn on_reporting_room_reaction(
         &self,
         reaction_sender: &RoomMember,
@@ -213,16 +232,18 @@ impl EventCallback {
         message_event_id: &EventId,
         reaction_event_id: &EventId,
     ) {
-        // Check if the sender is a editor (= has the permission to use emoji commands)
+        // Check if the sender is a editor (= has the permission to use emoji "commands")
         if !self.is_editor(&reaction_sender).await {
             return;
         }
 
-        let approval_emoji = &self.0.config.approval_emoji;
-        if reaction_emoji == approval_emoji.to_string() {
-            let message_event_id = message_event_id.to_string();
-            let reaction_event_id = reaction_event_id.to_string();
+        let message_event_id = message_event_id.to_string();
+        let reaction_event_id = reaction_event_id.to_string();
 
+        let approval_emoji = &self.0.config.approval_emoji;
+
+        // Approval emoji
+        if reaction_emoji == approval_emoji.to_string() {
             let msg = {
                 let mut news_store = self.0.news_store.lock().unwrap();
                 match news_store.approve_news(&message_event_id, &reaction_event_id) {
@@ -243,12 +264,15 @@ impl EventCallback {
             self.0.send_message(&msg, false, true).await;
         } else {
             debug!(
-                "Ignore emoji reaction, doesn't match approval emoji (approval: {:?} vs. reaction: {:?})",
-                approval_emoji, reaction_emoji
+                "Ignore emoji reaction, doesn't match any known emoji ({:?})",
+                reaction_emoji
             );
         }
     }
 
+    /// Something got redacted in reporting room
+    /// - Only redaction from editors are processed
+    /// - Undo any reaction emoji "command" (eg. unapproving a news entry)
     async fn on_reporting_room_redaction(&self, member: &RoomMember, redacted_event_id: &EventId) {
         // Check if the sender is a editor (= has the permission to use emoji commands)
         if !self.is_editor(&member).await {
@@ -257,6 +281,8 @@ impl EventCallback {
 
         let msg = {
             let mut news_store = self.0.news_store.lock().unwrap();
+
+            // Try to unapprove a message
             if let Ok(news) = news_store.unapprove_news(&redacted_event_id.to_string()) {
                 let mut msg = format!(
                     "Editor {} removed their approval from {}'s news entry (ID {}).",
@@ -280,6 +306,8 @@ impl EventCallback {
         }
     }
 
+    /// New message in admin room
+    /// This is just for administrative stuff (eg. commands)
     async fn on_admin_room_message(&self, msg: String, member: &RoomMember) {
         // Check if the message is a command
         if !msg.as_str().starts_with('!') {
@@ -307,6 +335,7 @@ impl EventCallback {
         match command {
             "!render-message" => self.render_message_command(member).await,
             "!status" => self.status_command().await,
+            "!show-config" => self.show_config_command().await,
             "!clear" => self.clear_command().await,
             "!help" => self.help_command().await,
             "!say" => self.say_command(&args).await,
@@ -319,6 +348,7 @@ impl EventCallback {
             !render-message \n\
             !render-file \n\
             !status \n\
+            !show-config \n\
             !clear \n\
             !say <message>";
 
@@ -348,6 +378,16 @@ impl EventCallback {
         };
 
         self.0.send_message(&msg, false, true).await;
+    }
+
+    async fn show_config_command(&self) {
+        let mut config = self.0.config.clone();
+
+        // Don't print bot password
+        config.bot_password = "".to_string();
+
+        let msg = format!("<pre><code>{:#?}</code></pre>\n", config);
+        self.0.send_message(&msg, true, true).await;
     }
 
     async fn render_message_command(&self, editor: &RoomMember) {

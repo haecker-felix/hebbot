@@ -46,8 +46,7 @@ impl NewsStore {
         self.write_data();
     }
 
-    /// Tries to add an news approval
-    /// Returns news entry when approval got successfully added
+    /// Tries to add a news approval
     pub fn approve_news(
         &mut self,
         news_event_id: &str,
@@ -55,11 +54,12 @@ impl NewsStore {
     ) -> Result<News, Error> {
         if let Some(news) = self.news_map.get(news_event_id) {
             let mut updated_news = news.clone();
-            updated_news
-                .approvals
-                .insert(0, reaction_event_id.to_string());
-            self.news_map
-                .insert(news_event_id.to_string(), updated_news.clone());
+            let reaction_id = reaction_event_id.to_string();
+            let news_id = news_event_id.to_string();
+
+            updated_news.approvals.insert(0, reaction_id);
+            self.news_map.insert(news_id, updated_news.clone());
+
             self.write_data();
             Ok(updated_news)
         } else {
@@ -68,8 +68,7 @@ impl NewsStore {
         }
     }
 
-    /// Tries to remove an news approval
-    /// Returns news entry when approval got successfully removed
+    /// Tries to remove a news approval
     pub fn unapprove_news(&mut self, redacted_event_id: &str) -> Result<News, Error> {
         // Check if we have a news approval with a matching reaction event_id (=redacted_event_id)
         for n in self.news_map.values() {
@@ -77,8 +76,10 @@ impl NewsStore {
                 if approval == redacted_event_id {
                     let mut updated_news = n.clone();
                     updated_news.approvals.remove(i);
-                    self.news_map
-                        .insert(updated_news.event_id.clone(), updated_news.clone());
+
+                    let id = updated_news.event_id.clone();
+                    self.news_map.insert(id, updated_news.clone());
+
                     self.write_data();
                     return Ok(updated_news);
                 }
@@ -96,12 +97,15 @@ impl NewsStore {
         self.news_map.values().cloned().collect()
     }
 
+    /// Wipes all news entries
     pub fn clear_news(&mut self) {
         self.news_map.clear();
         self.write_data();
     }
 
+    /// Writes data as JSON to disk
     fn write_data(&self) {
+        debug!("Write data...");
         let json = serde_json::to_string_pretty(&self.news_map).unwrap();
         let path = Self::get_path();
         fs::write(path, json).expect("Unable to write news store");
