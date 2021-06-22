@@ -6,6 +6,7 @@ use matrix_sdk::EventHandler;
 use matrix_sdk::RoomMember;
 use matrix_sdk::SyncSettings;
 use matrix_sdk_common::uuid::Uuid;
+use regex::Regex;
 use ruma::events::reaction::ReactionEventContent;
 use ruma::events::room::redaction::SyncRedactionEvent;
 use ruma::events::SyncMessageEvent;
@@ -143,9 +144,12 @@ impl EventHandler for EventCallback {
             // Reporting room
             if room.room_id() == self.0.reporting_room.room_id() {
                 let emoji = &relation.emoji;
+                // Remove emoji variant form
+                let emoji = emoji.replace("\u{fe0f}", "");
+
                 self.on_reporting_room_reaction(
                     &reaction_sender,
-                    emoji,
+                    &emoji,
                     &message_event_id,
                     &reaction_event_id,
                 )
@@ -216,7 +220,7 @@ impl EventCallback {
         }
 
         let approval_emoji = &self.0.config.approval_emoji;
-        if reaction_emoji == approval_emoji {
+        if reaction_emoji == &approval_emoji.to_string() {
             let message_event_id = message_event_id.to_string();
             let reaction_event_id = reaction_event_id.to_string();
 
@@ -240,7 +244,7 @@ impl EventCallback {
             self.0.send_message(&msg, false, true).await;
         } else {
             debug!(
-                "Ignore emoji reaction, doesn't match approval emoji ({} vs. {})",
+                "Ignore emoji reaction, doesn't match approval emoji (approval: {:?} vs. reaction: {:?})",
                 approval_emoji, reaction_emoji
             );
         }

@@ -10,7 +10,7 @@ pub struct Config {
     pub bot_password: String,
     pub reporting_room_id: String,
     pub admin_room_id: String,
-    pub approval_emoji: String,
+    pub approval_emoji: char,
     pub editors: Vec<String>,
 }
 
