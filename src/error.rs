@@ -1,5 +1,5 @@
 #[derive(Debug)]
 pub enum Error {
     NewsEventIdNotFound,
-    ApprovalReactionIdNotFound,
+    RedactionEventIdNotFound,
 }

@@ -239,34 +239,89 @@ impl EventCallback {
 
         let message_event_id = message_event_id.to_string();
         let reaction_event_id = reaction_event_id.to_string();
-
+        let reaction_emoji = reaction_emoji.chars().collect::<Vec<char>>()[0];
         let approval_emoji = &self.0.config.approval_emoji;
 
         // Approval emoji
-        if reaction_emoji == approval_emoji.to_string() {
-            let msg = {
-                let mut news_store = self.0.news_store.lock().unwrap();
-                match news_store.approve_news(&message_event_id, &reaction_event_id) {
-                    Ok(news) => format!(
-                        "Editor {} approved {}'s news entry (ID {})",
-                        reaction_sender.user_id().to_string(),
-                        news.reporter_id,
-                        message_event_id
-                    ),
-                    Err(err) => format!(
-                        "Unable to add {}'s news approval (ID {}): {:?}",
-                        reaction_sender.user_id().to_string(),
-                        message_event_id,
-                        err
-                    ),
-                }
+        let message = if &reaction_emoji == approval_emoji {
+            let mut news_store = self.0.news_store.lock().unwrap();
+            let msg = match news_store.add_news_approval(
+                &message_event_id,
+                &reaction_event_id,
+                reaction_emoji,
+            ) {
+                Ok(news) => format!(
+                    "Editor {} approved {}'s news entry.",
+                    reaction_sender.user_id().to_string(),
+                    news.reporter_id
+                ),
+                Err(err) => format!(
+                    "Unable to add {}'s news approval: {:?}\n(ID {})",
+                    reaction_sender.user_id().to_string(),
+                    err,
+                    message_event_id
+                ),
             };
-            self.0.send_message(&msg, false, true).await;
+            Some(msg)
+
+        // Section emoji
+        } else if let Some(section) = &self.0.config.section_by_emoji(&reaction_emoji) {
+            let mut news_store = self.0.news_store.lock().unwrap();
+            let msg = match news_store.add_news_section(
+                &message_event_id,
+                &reaction_event_id,
+                reaction_emoji,
+            ) {
+                Ok(news) => format!(
+                    "Editor {} added {}'s news entry to the \"{}\" section.",
+                    reaction_sender.user_id().to_string(),
+                    news.reporter_id,
+                    section.title
+                ),
+                Err(err) => format!(
+                    "Unable to add {}'s news entry to the {} section: {:?}\n(ID {})",
+                    reaction_sender.user_id().to_string(),
+                    section.title,
+                    err,
+                    message_event_id
+                ),
+            };
+            Some(msg)
+
+        // Project emoji
+        } else if let Some(project) = &self.0.config.project_by_emoji(&reaction_emoji) {
+            let mut news_store = self.0.news_store.lock().unwrap();
+            let msg = match news_store.add_news_project(
+                &message_event_id,
+                &reaction_event_id,
+                reaction_emoji,
+            ) {
+                Ok(news) => format!(
+                    "Editor {} added the project description \"{}\" to {}'s news entry.",
+                    reaction_sender.user_id().to_string(),
+                    project.title,
+                    news.reporter_id
+                ),
+                Err(err) => format!(
+                    "Unable to add project description \"{}\"  to {}'s news entry: {:?}\n(ID {})",
+                    project.title,
+                    reaction_sender.user_id().to_string(),
+                    err,
+                    message_event_id
+                ),
+            };
+            Some(msg)
         } else {
             debug!(
                 "Ignore emoji reaction, doesn't match any known emoji ({:?})",
                 reaction_emoji
             );
+            None
+        };
+
+        // Send confirm message to admin room
+        if let Some(message) = message {
+            self.0.send_message(&message, false, true).await;
         }
     }
 
@@ -279,16 +334,16 @@ impl EventCallback {
             return;
         }
 
-        let msg = {
+        let message = {
             let mut news_store = self.0.news_store.lock().unwrap();
+            let redacted_event_id = redacted_event_id.to_string();
 
-            // Try to unapprove a message
-            if let Ok(news) = news_store.unapprove_news(&redacted_event_id.to_string()) {
+            // News approval
+            if let Ok(news) = news_store.remove_news_approval(&redacted_event_id) {
                 let mut msg = format!(
-                    "Editor {} removed their approval from {}'s news entry (ID {}).",
+                    "Editor {} removed their approval from {}'s news entry.",
                     member.user_id().to_string(),
-                    news.reporter_id,
-                    news.event_id
+                    news.reporter_id
                 );
 
                 if news.approvals.is_empty() {
@@ -296,13 +351,34 @@ impl EventCallback {
                 }
 
                 Some(msg)
+
+            // News section
+            } else if let Ok(news) = news_store.remove_news_section(&redacted_event_id) {
+                Some(format!(
+                    "Editor {} removed a section from {}'s news entry.",
+                    member.user_id().to_string(),
+                    news.reporter_id
+                ))
+
+            // News project
+            } else if let Ok(news) = news_store.remove_news_project(&redacted_event_id) {
+                Some(format!(
+                    "Editor {} removed a project from {}'s news entry.",
+                    member.user_id().to_string(),
+                    news.reporter_id
+                ))
             } else {
+                debug!(
+                    "Ignore redaction, doesn't match any known emoji reaction event id (ID {:?})",
+                    redacted_event_id
+                );
                 None
             }
         };
 
-        if let Some(msg) = msg {
-            self.0.send_message(&msg, false, true).await;
+        // Send confirm message to admin room
+        if let Some(message) = message {
+            self.0.send_message(&message, false, true).await;
         }
     }
 

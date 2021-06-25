@@ -8,13 +8,22 @@ use std::io::Read;
 
 use crate::error::Error;
 
+#[derive(Clone, Debug)]
+enum EmojiType {
+    Approval,
+    Section,
+    Project,
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct News {
     pub event_id: String,
     pub reporter_id: String,
     pub reporter_display_name: String,
     pub message: String,
-    pub approvals: Vec<String>,
+    pub approvals: HashMap<String, char>,
+    pub sections: HashMap<String, char>,
+    pub projects: HashMap<String, char>,
 }
 
 #[derive(Clone)]
@@ -46,51 +55,64 @@ impl NewsStore {
         self.write_data();
     }
 
-    /// Tries to add a news approval
-    pub fn approve_news(
+    /// Add news approval, returns updated news entry
+    pub fn add_news_approval(
         &mut self,
         news_event_id: &str,
         reaction_event_id: &str,
+        reaction_emoji: char,
     ) -> Result<News, Error> {
-        if let Some(news) = self.news_map.get(news_event_id) {
-            let mut updated_news = news.clone();
-            let reaction_id = reaction_event_id.to_string();
-            let news_id = news_event_id.to_string();
-
-            updated_news.approvals.insert(0, reaction_id);
-            self.news_map.insert(news_id, updated_news.clone());
-
-            self.write_data();
-            Ok(updated_news)
-        } else {
-            warn!("Cannot approve news, event_id not found");
-            Err(Error::NewsEventIdNotFound)
-        }
+        self.add_news_emoji(
+            EmojiType::Approval,
+            news_event_id,
+            reaction_event_id,
+            reaction_emoji,
+        )
     }
 
-    /// Tries to remove a news approval
-    pub fn unapprove_news(&mut self, redacted_event_id: &str) -> Result<News, Error> {
-        // Check if we have a news approval with a matching reaction event_id (=redacted_event_id)
-        for n in self.news_map.values() {
-            for (i, approval) in n.approvals.iter().enumerate() {
-                if approval == redacted_event_id {
-                    let mut updated_news = n.clone();
-                    updated_news.approvals.remove(i);
+    /// Add news section, returns updated news entry
+    pub fn add_news_section(
+        &mut self,
+        news_event_id: &str,
+        reaction_event_id: &str,
+        reaction_emoji: char,
+    ) -> Result<News, Error> {
+        self.add_news_emoji(
+            EmojiType::Section,
+            news_event_id,
+            reaction_event_id,
+            reaction_emoji,
+        )
+    }
 
-                    let id = updated_news.event_id.clone();
-                    self.news_map.insert(id, updated_news.clone());
+    /// Add news project, returns updated news entry
+    pub fn add_news_project(
+        &mut self,
+        news_event_id: &str,
+        reaction_event_id: &str,
+        reaction_emoji: char,
+    ) -> Result<News, Error> {
+        self.add_news_emoji(
+            EmojiType::Project,
+            news_event_id,
+            reaction_event_id,
+            reaction_emoji,
+        )
+    }
 
-                    self.write_data();
-                    return Ok(updated_news);
-                }
-            }
-        }
+    /// Remove news approval, returns updated news entry
+    pub fn remove_news_approval(&mut self, redacted_event_id: &str) -> Result<News, Error> {
+        self.remove_news_emoji(EmojiType::Approval, redacted_event_id)
+    }
 
-        warn!(
-            "Cannot unapprove news, no reaction id {} found",
-            redacted_event_id
-        );
-        Err(Error::ApprovalReactionIdNotFound)
+    /// Remove news section, returns updated news entry
+    pub fn remove_news_section(&mut self, redacted_event_id: &str) -> Result<News, Error> {
+        self.remove_news_emoji(EmojiType::Section, redacted_event_id)
+    }
+
+    /// Remove news project, returns updated news entry
+    pub fn remove_news_project(&mut self, redacted_event_id: &str) -> Result<News, Error> {
+        self.remove_news_emoji(EmojiType::Project, redacted_event_id)
     }
 
     pub fn get_news(&self) -> Vec<News> {
@@ -116,5 +138,79 @@ impl NewsStore {
             Ok(val) => val,
             Err(_) => "./store.json".to_string(),
         }
+    }
+
+    fn add_news_emoji(
+        &mut self,
+        emoji_type: EmojiType,
+        news_event_id: &str,
+        reaction_event_id: &str,
+        reaction_emoji: char,
+    ) -> Result<News, Error> {
+        if let Some(news) = self.news_map.get(news_event_id) {
+            let mut updated_news = news.clone();
+
+            match emoji_type {
+                EmojiType::Approval => updated_news
+                    .approvals
+                    .insert(reaction_event_id.to_string(), reaction_emoji),
+                EmojiType::Section => updated_news
+                    .sections
+                    .insert(reaction_event_id.to_string(), reaction_emoji),
+                EmojiType::Project => updated_news
+                    .projects
+                    .insert(reaction_event_id.to_string(), reaction_emoji),
+            };
+            self.news_map
+                .insert(news_event_id.to_string(), updated_news.clone());
+
+            self.write_data();
+            Ok(updated_news)
+        } else {
+            warn!(
+                "Cannot add {:?} emoji, news event id {} not found",
+                emoji_type, news_event_id
+            );
+            Err(Error::NewsEventIdNotFound)
+        }
+    }
+
+    /// Tries to remove a news approval
+    fn remove_news_emoji(
+        &mut self,
+        emoji_type: EmojiType,
+        redacted_event_id: &str,
+    ) -> Result<News, Error> {
+        for news in self.news_map.values() {
+            let map = match emoji_type {
+                EmojiType::Approval => &news.approvals,
+                EmojiType::Section => &news.sections,
+                EmojiType::Project => &news.projects,
+            };
+
+            if map.contains_key(redacted_event_id) {
+                let mut updated_news = news.clone();
+
+                match emoji_type {
+                    EmojiType::Approval => {
+                        updated_news.approvals.remove(redacted_event_id).unwrap()
+                    }
+                    EmojiType::Section => updated_news.sections.remove(redacted_event_id).unwrap(),
+                    EmojiType::Project => updated_news.projects.remove(redacted_event_id).unwrap(),
+                };
+
+                let news_id = updated_news.event_id.clone();
+                self.news_map.insert(news_id, updated_news.clone());
+                self.write_data();
+
+                return Ok(updated_news);
+            }
+        }
+
+        warn!(
+            "Unable to remove {:?} emoji, no matching event id found",
+            emoji_type
+        );
+        Err(Error::RedactionEventIdNotFound)
     }
 }
