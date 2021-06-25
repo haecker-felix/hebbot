@@ -472,8 +472,9 @@ impl EventCallback {
 
             let news_store = self.0.news_store.lock().unwrap();
             let news = news_store.get_news();
+            let config = self.0.config.clone();
 
-            let r = render::render(news, editor, &bot);
+            let r = render::render(news, config, editor, &bot);
 
             format!("<pre><code>{}</code></pre>\n", r)
         };

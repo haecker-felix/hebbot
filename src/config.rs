@@ -4,20 +4,18 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct Section {
     pub title: String,
     pub emoji: char,
-    pub order: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct Project {
     pub title: String,
     pub description: String,
     pub repository: String,
     pub emoji: char,
-    pub order: u32,
 }
 
 #[derive(Deserialize, Clone, Debug)]

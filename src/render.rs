@@ -1,15 +1,52 @@
 use matrix_sdk::RoomMember;
+use rand::Rng;
 use regex::Regex;
 use ruma::UserId;
 
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::env;
 use std::fs::File;
 use std::io::Read;
 
+use crate::config::Config;
+use crate::config::{Project, Section};
 use crate::store::News;
 use crate::utils;
 
-pub fn render(news: Vec<News>, editor: &RoomMember, bot: &UserId) -> String {
+pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember, bot: &UserId) -> String {
+    let mut section_map: HashMap<Section, Vec<News>> = HashMap::new();
+
+    // Sort news entries into sections
+    for news in news_list {
+        // skip not approved news
+        if news.approvals.is_empty() {
+            continue;
+        }
+
+        // Filter out duplicated sections
+        // (eg. two editors are adding the same section to a news entry)
+        let mut sections = HashSet::new();
+        for section in news.sections.values().collect::<Vec<&char>>() {
+            sections.insert(section);
+        }
+
+        if sections.is_empty() {
+            // For news entries without a section
+            let todo_section = Section {
+                title: "TODO".into(),
+                emoji: '❔',
+            };
+            insert_into_map(&mut section_map, &todo_section, news);
+        } else {
+            for section_emoji in sections {
+                let section = config.section_by_emoji(&section_emoji).unwrap();
+                insert_into_map(&mut section_map, &section, news.clone());
+            }
+        }
+    }
+
+    // Load template file
     let path = match env::var("TEMPLATE_PATH") {
         Ok(val) => val,
         Err(_) => "./template.md".to_string(),
@@ -20,29 +57,37 @@ pub fn render(news: Vec<News>, editor: &RoomMember, bot: &UserId) -> String {
     file.read_to_string(&mut template)
         .expect("Unable to read template file");
 
-    let mut report = String::new();
-    for n in news {
-        // skip not approved news
-        if n.approvals.is_empty() {
-            continue;
+    // Generate actual report
+    let mut report_text = String::new();
+    for (section, news) in section_map {
+        let mut section_text = format!("# {}\n", section.title);
+
+        for n in news {
+            // Filter out duplicated project
+            // (eg. two editors are adding the same project description to a news entry)
+            let mut projects = HashSet::new();
+            for project in n.projects.values().collect::<Vec<&char>>() {
+                projects.insert(project);
+            }
+
+            if projects.is_empty() {
+                // For news entries without a project
+                let project = Project {
+                    title: "TODO: Unknown project!".into(),
+                    ..Default::default()
+                };
+                let news_text = generate_news_text(&n, &project, bot);
+                section_text += &news_text;
+            } else {
+                for p in projects {
+                    let project = config.project_by_emoji(&p).unwrap();
+                    let news_text = generate_news_text(&n, &project, bot);
+                    section_text += &news_text;
+                }
+            }
         }
 
-        let section = "Section header (not implemented yet)";
-        let user = format!(
-            "[{}](https://matrix.to/#/{})",
-            n.reporter_display_name, n.reporter_id
-        );
-
-        let message = prepare_message(n.message, bot);
-
-        let section = format!(
-            "# {}\n\
-            {} reports that\n\n\
-            {}\n\n",
-            section, user, message
-        );
-
-        report = (report + &section).to_string();
+        report_text += &section_text;
     }
 
     // Editor user name / link
@@ -59,9 +104,41 @@ pub fn render(news: Vec<News>, editor: &RoomMember, bot: &UserId) -> String {
 
     template = template.replace("{{today}}", &today.to_string());
     template = template.replace("{{author}}", &author);
-    template = template.replace("{{report}}", &report);
+    template = template.replace("{{report}}", &report_text);
 
     template
+}
+
+fn insert_into_map(section_map: &mut HashMap<Section, Vec<News>>, section: &Section, news: News) {
+    if let Some(entries) = section_map.get_mut(&section) {
+        entries.insert(0, news);
+    } else {
+        let mut entries = Vec::new();
+        entries.insert(0, news);
+        section_map.insert(section.clone(), entries);
+    }
+}
+
+fn generate_news_text(news: &News, project: &Project, bot: &UserId) -> String {
+    let user = format!(
+        "[{}](https://matrix.to/#/{})",
+        news.reporter_display_name, news.reporter_id
+    );
+
+    let project_repo = format!("[{}]({})", project.title, project.repository);
+    let project_text = project.description.replace("{{project}}", &project_repo);
+    let verb = random_verb();
+    let message = prepare_message(news.message.clone(), bot);
+
+    let news_text = format!(
+        "### {}\n\n\
+        {}\n\n\
+        {} {}\n\n\
+        {}\n\n",
+        project.title, project_text, user, verb, message
+    );
+
+    news_text
 }
 
 fn prepare_message(msg: String, bot: &UserId) -> String {
@@ -79,4 +156,11 @@ fn prepare_message(msg: String, bot: &UserId) -> String {
 
     // lists
     msg.replace("> -", "> *")
+}
+
+fn random_verb() -> String {
+    let mut rng = rand::thread_rng();
+    let verbs = vec!["reports", "offers", "said", "announces", "reveals", "tells"];
+    let id = rng.gen_range(0..verbs.len());
+    verbs[id].to_string()
 }
