@@ -74,6 +74,8 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember, bot: &U
                 // For news entries without a project
                 let project = Project {
                     title: "TODO: Unknown project!".into(),
+                    description: "This message was not annotated with a project description."
+                        .into(),
                     ..Default::default()
                 };
                 let news_text = generate_news_text(&n, &project, bot);
@@ -89,6 +91,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember, bot: &U
 
         report_text += &section_text;
     }
+    let report_text = report_text.trim();
 
     // Editor user name / link
     let display_name = utils::get_member_display_name(editor);
