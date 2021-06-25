@@ -75,7 +75,7 @@ impl Bot {
     async fn login(client: &Client, user: &str, pwd: &str) {
         info!("Logging in...");
         let response = client
-            .login(user, pwd, None, Some("hebbot"))
+            .login(user, pwd, Some("hebbot"), Some("hebbot"))
             .await
             .expect("Unable to login");
 
