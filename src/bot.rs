@@ -201,23 +201,32 @@ impl EventCallback {
         let reporter_id = member.user_id().to_string();
         let reporter_display_name = utils::get_member_display_name(&member);
 
-        let msg = format!(
-            "Thanks for the report {}, I'll store your update!",
-            reporter_display_name
-        );
-        self.0.send_message(&msg, false, false).await;
+        // Check min message length
+        if message.len() > 30 {
+            let msg = format!(
+                "Thanks for the report {}, I'll store your update!",
+                reporter_display_name
+            );
+            self.0.send_message(&msg, false, false).await;
 
-        // Create new news entry...
-        let news = News {
-            event_id,
-            reporter_id,
-            reporter_display_name,
-            message,
-            ..Default::default()
-        };
+            // Create new news entry...
+            let news = News {
+                event_id,
+                reporter_id,
+                reporter_display_name,
+                message,
+                ..Default::default()
+            };
 
-        // ...and save it for the next report!
-        self.0.news_store.lock().unwrap().add_news(news);
+            // ...and save it for the next report!
+            self.0.news_store.lock().unwrap().add_news(news);
+        } else {
+            let msg = format!(
+                "{}: Your update is too short and was not stored. This limitation was set-up to limit spam.",
+                reporter_display_name
+            );
+            self.0.send_message(&msg, false, false).await;
+        }
     }
 
     /// New emoji reaction in reporting room
