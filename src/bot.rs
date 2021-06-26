@@ -244,6 +244,10 @@ impl EventCallback {
             );
             self.0.send_message(&msg, false, false).await;
 
+            let link = self.message_link(event_id.to_string());
+            let msg = format!("{} submitted a news entry. [{}]", member.user_id(), link);
+            self.0.send_message(&msg, true, true).await;
+
             // remove bot name from message
             let regex = format!("^@?{}(:{})?:?", bot.localpart(), bot.server_name());
             let re = Regex::new(&regex).unwrap();
@@ -287,9 +291,11 @@ impl EventCallback {
             .update_news(event_id, updated_message)
         {
             if !news.approvals.is_empty() {
+                let link = self.message_link(edited_msg_event_id.to_string());
                 let msg = format!(
-                    "The news entry by {} got edited. Check the new text, and make sure if you want to keep the approval.",
-                    news.reporter_id
+                    "The news entry by {} got edited ({}). Check the new text, and make sure if you want to keep the approval.",
+                    news.reporter_id,
+                    link
                 );
                 Some(msg)
             } else {
@@ -300,7 +306,7 @@ impl EventCallback {
         };
 
         if let Some(message) = message {
-            self.0.send_message(&message, false, true).await;
+            self.0.send_message(&message, true, true).await;
         }
     }
 
@@ -325,6 +331,7 @@ impl EventCallback {
         let reaction_event_id = reaction_event_id.to_string();
         let reaction_emoji = reaction_emoji.chars().collect::<Vec<char>>()[0];
         let approval_emoji = &self.0.config.approval_emoji;
+        let link = self.message_link(message_event_id.clone());
 
         // Approval emoji
         let message = if &reaction_emoji == approval_emoji {
@@ -335,13 +342,15 @@ impl EventCallback {
                 reaction_emoji,
             ) {
                 Ok(news) => format!(
-                    "Editor {} approved {}'s news entry.",
+                    "Editor {} approved {}'s news entry. ({})",
                     reaction_sender.user_id().to_string(),
-                    news.reporter_id
+                    news.reporter_id,
+                    link
                 ),
                 Err(err) => format!(
-                    "Unable to add {}'s news approval: {:?}\n(ID {})",
+                    "Unable to add {}'s news approval ({}): {:?}\n(ID {})",
                     reaction_sender.user_id().to_string(),
+                    link,
                     err,
                     message_event_id
                 ),
@@ -357,14 +366,16 @@ impl EventCallback {
                 reaction_emoji,
             ) {
                 Ok(news) => format!(
-                    "Editor {} added {}'s news entry to the \"{}\" section.",
+                    "Editor {} added {}'s news entry ({}) to the \"{}\" section.",
                     reaction_sender.user_id().to_string(),
                     news.reporter_id,
+                    link,
                     section.title
                 ),
                 Err(err) => format!(
-                    "Unable to add {}'s news entry to the {} section: {:?}\n(ID {})",
+                    "Unable to add {}'s news entry ({}) to the {} section: {:?}\n(ID {})",
                     reaction_sender.user_id().to_string(),
+                    link,
                     section.title,
                     err,
                     message_event_id
@@ -381,15 +392,17 @@ impl EventCallback {
                 reaction_emoji,
             ) {
                 Ok(news) => format!(
-                    "Editor {} added the project description \"{}\" to {}'s news entry.",
+                    "Editor {} added the project description \"{}\" to {}'s news entry ({}).",
                     reaction_sender.user_id().to_string(),
                     project.title,
-                    news.reporter_id
+                    news.reporter_id,
+                    link
                 ),
                 Err(err) => format!(
-                    "Unable to add project description \"{}\"  to {}'s news entry: {:?}\n(ID {})",
+                    "Unable to add project description \"{}\"  to {}'s news entry ({}): {:?}\n(ID {})",
                     project.title,
                     reaction_sender.user_id().to_string(),
+                    link,
                     err,
                     message_event_id
                 ),
@@ -405,7 +418,7 @@ impl EventCallback {
 
         // Send confirm message to admin room
         if let Some(message) = message {
-            self.0.send_message(&message, false, true).await;
+            self.0.send_message(&message, true, true).await;
         }
     }
 
@@ -423,20 +436,22 @@ impl EventCallback {
         let message = {
             let mut news_store = self.0.news_store.lock().unwrap();
             let redacted_event_id = redacted_event_id.to_string();
+            let link = self.message_link(redacted_event_id.clone());
 
             // News entry itself
             if let Ok(news) = news_store.remove_news(&redacted_event_id) {
                 Some(format!(
                     "{}'s news entry got removed by {}",
                     news.reporter_id,
-                    member.user_id().to_string(),
+                    member.user_id().to_string()
                 ))
             // News approval
             } else if let Ok(news) = news_store.remove_news_approval(&redacted_event_id) {
                 let mut msg = format!(
-                    "Editor {} removed their approval from {}'s news entry.",
+                    "Editor {} removed their approval from {}'s news entry ({}).",
                     member.user_id().to_string(),
-                    news.reporter_id
+                    news.reporter_id,
+                    link
                 );
 
                 if news.approvals.is_empty() {
@@ -448,17 +463,19 @@ impl EventCallback {
             // News section
             } else if let Ok(news) = news_store.remove_news_section(&redacted_event_id) {
                 Some(format!(
-                    "Editor {} removed a section from {}'s news entry.",
+                    "Editor {} removed a section from {}'s news entry ({}).",
                     member.user_id().to_string(),
-                    news.reporter_id
+                    news.reporter_id,
+                    link
                 ))
 
             // News project
             } else if let Ok(news) = news_store.remove_news_project(&redacted_event_id) {
                 Some(format!(
-                    "Editor {} removed a project from {}'s news entry.",
+                    "Editor {} removed a project from {}'s news entry ({}).",
                     member.user_id().to_string(),
-                    news.reporter_id
+                    news.reporter_id,
+                    link
                 ))
             } else {
                 debug!(
@@ -471,7 +488,7 @@ impl EventCallback {
 
         // Send confirm message to admin room
         if let Some(message) = message {
-            self.0.send_message(&message, false, true).await;
+            self.0.send_message(&message, true, true).await;
         }
     }
 
@@ -533,7 +550,6 @@ impl EventCallback {
         let msg = {
             let news_store = self.0.news_store.lock().unwrap();
             let news = news_store.get_news();
-            let room_id = self.0.config.reporting_room_id.clone();
 
             let mut approved_count = 0;
             let mut unapproved_count = 0;
@@ -542,21 +558,15 @@ impl EventCallback {
             let mut unapproved_list = String::new();
 
             for n in news {
-                let link = format!("https://matrix.to/#/{}/{}", room_id, n.event_id);
+                let link = self.message_link(n.event_id);
                 let summary = utils::summary(&n.message);
 
                 if !n.approvals.is_empty() {
                     approved_count += 1;
-                    approved_list += &format!(
-                        "- <a href=\"{}\">[open message]</a> {}: {} <br>",
-                        link, n.reporter_id, summary
-                    );
+                    approved_list += &format!("- [{}] {}: {} <br>", link, n.reporter_id, summary);
                 } else {
                     unapproved_count += 1;
-                    unapproved_list += &format!(
-                        "- <a href=\"{}\">[open message]</a> {}: {} <br>",
-                        link, n.reporter_id, summary
-                    );
+                    unapproved_list += &format!("- [{}] {}: {} <br>", link, n.reporter_id, summary);
                 }
             }
 
@@ -666,5 +676,13 @@ impl EventCallback {
     async fn is_editor(&self, member: &RoomMember) -> bool {
         let user_id = member.user_id().to_string();
         self.0.config.editors.contains(&user_id)
+    }
+
+    fn message_link(&self, event_id: String) -> String {
+        let room_id = self.0.config.reporting_room_id.clone();
+        format!(
+            "<a href=\"https://matrix.to/#/{}/{}\">open message</a>",
+            room_id, event_id
+        )
     }
 }
