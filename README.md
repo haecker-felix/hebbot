@@ -22,7 +22,28 @@ In order to use the bot, two configuration files are required. The `config.json`
 For both configuration files, examples are available that can be used as templates (`.example` files). 
 
 ### Deployment
-TODO: Insert docker steps here
+The bot is available as [docker image](https://hub.docker.com/r/haeckerfelix/hebbot).
+
+Example docker-compose:
+
+```
+services:
+  hebbot:
+    image: haeckerfelix/hebbot:latest
+    restart: unless-stopped
+    volumes:
+      - hebbot_data:/data
+    environment:
+      - CONFIG_PATH=/data/config.json
+      - TEMPLATE_PATH=/data/template.md
+      - STORE_PATH=/data/store.json
+
+volumes:
+  hebbot_data:
+```
+
+The configuration files have to be placed in the `hebbot_data` volume.
+
 
 ### Example usage
 Hebbot gets used to generate the weekly GNOME summaries ("This Week in GNOME"). More information, and usage examples can be found here: TODO - insert blog post link here.
