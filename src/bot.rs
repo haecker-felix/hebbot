@@ -148,6 +148,7 @@ impl EventHandler for EventCallback {
     /// Handling room messages events
     async fn on_room_message(&self, room: Room, event: &SyncMessageEvent<MessageEventContent>) {
         if let Room::Joined(ref _joined) = room {
+            // Standard text message
             if let Some(text) = utils::get_message_event_text(event) {
                 let member = room.get_member(&event.sender).await.unwrap().unwrap();
                 let id = &event.event_id;
@@ -160,6 +161,15 @@ impl EventHandler for EventCallback {
                 // Admin room
                 if room.room_id() == self.0.admin_room.room_id() {
                     self.on_admin_room_message(text, &member).await;
+                }
+            }
+
+            // Message edit
+            if let Some((edited_msg_event_id, text)) = utils::get_edited_message_event_text(event) {
+                // Reporting room
+                if room.room_id() == self.0.reporting_room.room_id() {
+                    self.on_reporting_room_msg_edit(text.clone(), &edited_msg_event_id)
+                        .await;
                 }
             }
         }
@@ -249,6 +259,40 @@ impl EventCallback {
                 reporter_display_name
             );
             self.0.send_message(&msg, false, false).await;
+        }
+    }
+
+    /// New message in reporting room
+    /// - When the bot gets mentioned at the beginning of the message,
+    ///   the message will get stored as News in NewsStore
+    async fn on_reporting_room_msg_edit(
+        &self,
+        updated_message: String,
+        edited_msg_event_id: &EventId,
+    ) {
+        let event_id = edited_msg_event_id.to_string();
+        let message = if let Ok(news) = self
+            .0
+            .news_store
+            .lock()
+            .unwrap()
+            .update_news(event_id, updated_message)
+        {
+            if !news.approvals.is_empty() {
+                let msg = format!(
+                    "The news entry by {} got edited. Check the new text, and make sure if you want to keep the approval.",
+                    news.reporter_id
+                );
+                Some(msg)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if let Some(message) = message {
+            self.0.send_message(&message, false, true).await;
         }
     }
 

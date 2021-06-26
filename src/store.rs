@@ -55,6 +55,25 @@ impl NewsStore {
         self.write_data();
     }
 
+    pub fn update_news(
+        &mut self,
+        news_event_id: String,
+        updated_text: String,
+    ) -> Result<News, Error> {
+        if let Some(news) = self.news_map.get(&news_event_id) {
+            let mut updated_news = news.clone();
+            updated_news.message = updated_text;
+
+            info!("Updated news entry with event id {}", news_event_id);
+            self.news_map.insert(news_event_id, updated_news.clone());
+
+            self.write_data();
+            return Ok(updated_news);
+        }
+
+        Err(Error::NewsEventIdNotFound)
+    }
+
     /// Add news approval, returns updated news entry
     pub fn add_news_approval(
         &mut self,

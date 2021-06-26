@@ -1,8 +1,11 @@
 use matrix_sdk::events::room::message::MessageEventContent;
 use matrix_sdk::BaseRoomMember;
 use ruma::events::room::message::MessageType;
+use ruma::events::room::message::Relation;
 use ruma::events::room::message::TextMessageEventContent;
+use ruma::events::room::relationships::Replacement;
 use ruma::events::SyncMessageEvent;
+use ruma::EventId;
 use ruma::UserId;
 
 /// A simplified way of getting the text from a message event
@@ -11,12 +14,45 @@ pub fn get_message_event_text(event: &SyncMessageEvent<MessageEventContent>) -> 
         content:
             MessageEventContent {
                 msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
+                relates_to: None,
                 ..
             },
         ..
     } = event
     {
         return Some(msg_body.to_owned());
+    }
+    None
+}
+
+/// A simplified way of getting an edited message
+pub fn get_edited_message_event_text(
+    event: &SyncMessageEvent<MessageEventContent>,
+) -> Option<(EventId, String)> {
+    if let SyncMessageEvent {
+        content:
+            MessageEventContent {
+                relates_to:
+                    Some(Relation::Replacement {
+                        0: Replacement { event_id, .. },
+                        ..
+                    }),
+                new_content,
+                ..
+            },
+        ..
+    } = event
+    {
+        if let Some(content) = new_content {
+            if let MessageEventContent {
+                msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
+                relates_to: None,
+                ..
+            } = &**content
+            {
+                return Some((event_id.clone(), msg_body.to_string()));
+            }
+        }
     }
     None
 }
