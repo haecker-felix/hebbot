@@ -1,0 +1,8 @@
+/target
+.buildconfig
+config.json
+store.json
+backup.json
+template.md
+config.json.example
+template.md.example
