@@ -75,7 +75,7 @@ pub fn msg_starts_with_mention(user_id: UserId, msg: String) -> bool {
     msg.as_str().starts_with(localpart)
 }
 
-pub fn summary(message: &String) -> String {
+pub fn summary(message: &str) -> String {
     if message.len() > 60 {
         format!("{} ...", message.split_at(50).0)
     } else {
