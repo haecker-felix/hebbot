@@ -7,9 +7,12 @@ use matrix_sdk::RoomMember;
 use matrix_sdk::SyncSettings;
 use matrix_sdk_common::uuid::Uuid;
 use ruma::events::reaction::ReactionEventContent;
+use ruma::events::room::message::FileMessageEventContent;
+use ruma::events::room::message::MessageType;
 use ruma::events::room::redaction::SyncRedactionEvent;
 use ruma::events::SyncMessageEvent;
 use ruma::EventId;
+use ruma::MxcUri;
 use ruma::RoomId;
 use ruma::UserId;
 
@@ -114,6 +117,26 @@ impl Bot {
         room.send(content, Some(txn_id))
             .await
             .expect("Unable to send message");
+    }
+
+    /// Simplified method for sending a file
+    async fn send_file(&self, url: MxcUri, filename: String, admin_room: bool) {
+        debug!("Send file (url: {:?}, admin-room: {:?})", url, admin_room);
+
+        let file_content = FileMessageEventContent::plain(filename, url, None);
+        let msgtype = MessageType::File(file_content);
+        let content = AnyMessageEventContent::RoomMessage(MessageEventContent::new(msgtype));
+        let txn_id = Uuid::new_v4();
+
+        let room = if admin_room {
+            &self.admin_room
+        } else {
+            &self.reporting_room
+        };
+
+        room.send(content, Some(txn_id))
+            .await
+            .expect("Unable to send file");
     }
 }
 
@@ -419,6 +442,7 @@ impl EventCallback {
 
         match command {
             "!render-message" => self.render_message_command(member).await,
+            "!render-file" => self.render_file_command(member).await,
             "!status" => self.status_command().await,
             "!show-config" => self.show_config_command().await,
             "!clear" => self.clear_command().await,
@@ -489,6 +513,30 @@ impl EventCallback {
         };
 
         self.0.send_message(&rendered, true, true).await;
+    }
+
+    async fn render_file_command(&self, editor: &RoomMember) {
+        let rendered = {
+            let bot = self.0.client.user_id().await.unwrap();
+
+            let news_store = self.0.news_store.lock().unwrap();
+            let news = news_store.get_news();
+            let config = self.0.config.clone();
+
+            render::render(news, config, editor, &bot)
+        };
+        let mut bytes = rendered.as_bytes();
+
+        let response = self
+            .0
+            .client
+            .upload(&mime::TEXT_PLAIN_UTF_8, &mut bytes)
+            .await
+            .expect("Can't upload rendered file.");
+
+        self.0
+            .send_file(response.content_uri, "rendered.md".to_string(), true)
+            .await;
     }
 
     async fn clear_command(&self) {

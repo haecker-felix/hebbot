@@ -735,6 +735,7 @@ dependencies = [
  "log",
  "matrix-sdk",
  "matrix-sdk-common",
+ "mime",
  "pretty_env_logger",
  "rand",
  "regex",
