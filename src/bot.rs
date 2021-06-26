@@ -6,6 +6,7 @@ use matrix_sdk::EventHandler;
 use matrix_sdk::RoomMember;
 use matrix_sdk::SyncSettings;
 use matrix_sdk_common::uuid::Uuid;
+use regex::Regex;
 use ruma::events::reaction::ReactionEventContent;
 use ruma::events::room::message::FileMessageEventContent;
 use ruma::events::room::message::MessageType;
@@ -233,6 +234,7 @@ impl EventCallback {
         let event_id = event_id.to_string();
         let reporter_id = member.user_id().to_string();
         let reporter_display_name = utils::get_member_display_name(&member);
+        let bot = self.0.client.user_id().await.unwrap();
 
         // Check min message length
         if message.len() > 30 {
@@ -241,6 +243,12 @@ impl EventCallback {
                 reporter_display_name
             );
             self.0.send_message(&msg, false, false).await;
+
+            // remove bot name from message
+            let regex = format!("^@?{}(:{})?:?", bot.localpart(), bot.server_name());
+            let re = Regex::new(&regex).unwrap();
+            let message = re.replace(&message, "");
+            let message = message.trim().to_string();
 
             // Create new news entry...
             let news = News {
@@ -599,13 +607,11 @@ impl EventCallback {
 
     async fn render_message_command(&self, editor: &RoomMember) {
         let rendered = {
-            let bot = self.0.client.user_id().await.unwrap();
-
             let news_store = self.0.news_store.lock().unwrap();
             let news = news_store.get_news();
             let config = self.0.config.clone();
 
-            let r = render::render(news, config, editor, &bot);
+            let r = render::render(news, config, editor);
 
             format!("<pre><code>{}</code></pre>\n", r)
         };
@@ -615,13 +621,11 @@ impl EventCallback {
 
     async fn render_file_command(&self, editor: &RoomMember) {
         let rendered = {
-            let bot = self.0.client.user_id().await.unwrap();
-
             let news_store = self.0.news_store.lock().unwrap();
             let news = news_store.get_news();
             let config = self.0.config.clone();
 
-            render::render(news, config, editor, &bot)
+            render::render(news, config, editor)
         };
         let mut bytes = rendered.as_bytes();
 

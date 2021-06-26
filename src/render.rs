@@ -1,7 +1,5 @@
 use matrix_sdk::RoomMember;
 use rand::Rng;
-use regex::Regex;
-use ruma::UserId;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -14,7 +12,7 @@ use crate::config::{Project, Section};
 use crate::store::News;
 use crate::utils;
 
-pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember, bot: &UserId) -> String {
+pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> String {
     let mut section_map: HashMap<Section, Vec<News>> = HashMap::new();
 
     // Sort news entries into sections
@@ -78,12 +76,12 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember, bot: &U
                         .into(),
                     ..Default::default()
                 };
-                let news_text = generate_news_text(&n, &project, bot);
+                let news_text = generate_news_text(&n, &project);
                 section_text += &news_text;
             } else {
                 for p in projects {
                     let project = config.project_by_emoji(&p).unwrap();
-                    let news_text = generate_news_text(&n, &project, bot);
+                    let news_text = generate_news_text(&n, &project);
                     section_text += &news_text;
                 }
             }
@@ -122,7 +120,7 @@ fn insert_into_map(section_map: &mut HashMap<Section, Vec<News>>, section: &Sect
     }
 }
 
-fn generate_news_text(news: &News, project: &Project, bot: &UserId) -> String {
+fn generate_news_text(news: &News, project: &Project) -> String {
     let user = format!(
         "[{}](https://matrix.to/#/{})",
         news.reporter_display_name, news.reporter_id
@@ -131,7 +129,7 @@ fn generate_news_text(news: &News, project: &Project, bot: &UserId) -> String {
     let project_repo = format!("[{}]({})", project.title, project.repository);
     let project_text = project.description.replace("{{project}}", &project_repo);
     let verb = random_verb();
-    let message = prepare_message(news.message.clone(), bot);
+    let message = prepare_message(news.message.clone());
 
     let news_text = format!(
         "### {}\n\n\
@@ -144,13 +142,7 @@ fn generate_news_text(news: &News, project: &Project, bot: &UserId) -> String {
     news_text
 }
 
-fn prepare_message(msg: String, bot: &UserId) -> String {
-    let msg = msg.trim();
-
-    // remove bot user name
-    let regex = format!("^@?{}(:{})?:?", bot.localpart(), bot.server_name());
-    let re = Regex::new(&regex).unwrap();
-    let msg = re.replace(&msg, "");
+fn prepare_message(msg: String) -> String {
     let msg = msg.trim();
 
     // quote message
