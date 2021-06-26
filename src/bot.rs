@@ -525,25 +525,42 @@ impl EventCallback {
         let msg = {
             let news_store = self.0.news_store.lock().unwrap();
             let news = news_store.get_news();
+            let room_id = self.0.config.reporting_room_id.clone();
 
-            let news_count = news.len();
-            let mut news_approved_count = 0;
+            let mut approved_count = 0;
+            let mut unapproved_count = 0;
+            let sum = news.len();
+            let mut approved_list = String::new();
+            let mut unapproved_list = String::new();
 
             for n in news {
+                let link = format!("https://matrix.to/#/{}/{}", room_id, n.event_id);
+                let summary = utils::summary(&n.message);
+
                 if !n.approvals.is_empty() {
-                    news_approved_count += 1;
+                    approved_count += 1;
+                    approved_list += &format!(
+                        "- <a href=\"{}\">[open message]</a> {}: {} <br>",
+                        link, n.reporter_id, summary
+                    );
+                } else {
+                    unapproved_count += 1;
+                    unapproved_list += &format!(
+                        "- <a href=\"{}\">[open message]</a> {}: {} <br>",
+                        link, n.reporter_id, summary
+                    );
                 }
             }
 
             format!(
-                "Status: \n\n\
-                All news: {} \n\
-                Approved news: {}",
-                news_count, news_approved_count
+                "{} news in total <br><br>\
+                ✅ Approved news ({}): <br>{} <br>\
+                ❌ Unapproved news ({}): <br>{}",
+                sum, approved_count, approved_list, unapproved_count, unapproved_list
             )
         };
 
-        self.0.send_message(&msg, false, true).await;
+        self.0.send_message(&msg, true, true).await;
     }
 
     async fn list_config_command(&self) {

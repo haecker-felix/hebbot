@@ -74,3 +74,11 @@ pub fn msg_starts_with_mention(user_id: UserId, msg: String) -> bool {
     let msg = msg.replace(&format!("@{}", localpart), localpart);
     msg.as_str().starts_with(localpart)
 }
+
+pub fn summary(message: &String) -> String {
+    if message.len() > 60 {
+        format!("{} ...", message.split_at(50).0)
+    } else {
+        message.to_string()
+    }
+}
