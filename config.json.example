@@ -1,0 +1,35 @@
+{
+	"bot_user_id": "@botname:domain.org",
+	"bot_password": "supersecurepassword",
+	"reporting_room_id": "!roomid:domain.org",
+	"admin_room_id": "!adminroomid:domain.org",
+	"approval_emoji": "⭕",
+	"editors": [
+		"@user1:domain.io",
+		"@user1:domain.org"
+	],
+	"sections": [
+                {
+                        "title": "New projects",
+                        "emoji": "⚙"
+                },
+                {
+                        "title": "Updated Apps",
+                        "emoji": "🔵"
+                },
+                {
+                        "title": "Interesting Projects",
+                        "emoji": "🛰"
+                }
+
+	],
+	"projects": [
+                {
+                        "title": "Radio Player",
+			"description": "With {{project}} you can listen to internet radio stations.",
+                        "repository": "https://gitlab.domain.org/userid/radio-player",
+			"emoji": "📻"
+                }
+        ]
+
+}
