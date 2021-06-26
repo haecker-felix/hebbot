@@ -497,7 +497,9 @@ impl EventCallback {
             "!render-message" => self.render_message_command(member).await,
             "!render-file" => self.render_file_command(member).await,
             "!status" => self.status_command().await,
-            "!show-config" => self.show_config_command().await,
+            "!list-sections" => self.list_sections_command().await,
+            "!list-projects" => self.list_projects_command().await,
+            "!list-config" => self.list_config_command().await,
             "!clear" => self.clear_command().await,
             "!help" => self.help_command().await,
             "!say" => self.say_command(&args).await,
@@ -510,7 +512,9 @@ impl EventCallback {
             !render-message \n\
             !render-file \n\
             !status \n\
-            !show-config \n\
+            !list-sections \n\
+            !list-projects \n\
+            !list-config \n\
             !clear \n\
             !say <message>";
 
@@ -542,13 +546,37 @@ impl EventCallback {
         self.0.send_message(&msg, false, true).await;
     }
 
-    async fn show_config_command(&self) {
+    async fn list_config_command(&self) {
         let mut config = self.0.config.clone();
 
         // Don't print bot password
         config.bot_password = "".to_string();
 
         let msg = format!("<pre><code>{:#?}</code></pre>\n", config);
+        self.0.send_message(&msg, true, true).await;
+    }
+
+    async fn list_sections_command(&self) {
+        let config = self.0.config.clone();
+
+        let mut list = String::new();
+        for e in config.sections {
+            list += &format!("{}: {}\n", e.emoji, e.title);
+        }
+
+        let msg = format!("List of sections:\n<pre><code>{}</code></pre>\n", list);
+        self.0.send_message(&msg, true, true).await;
+    }
+
+    async fn list_projects_command(&self) {
+        let config = self.0.config.clone();
+
+        let mut list = String::new();
+        for e in config.projects {
+            list += &format!("{}: {}\n", e.emoji, e.title);
+        }
+
+        let msg = format!("List of projects:\n<pre><code>{}</code></pre>\n", list);
         self.0.send_message(&msg, true, true).await;
     }
 
