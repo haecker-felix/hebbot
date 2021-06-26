@@ -405,6 +405,8 @@ impl EventCallback {
     /// - Only redaction from editors are processed
     /// - Undo any reaction emoji "command" (eg. unapproving a news entry)
     async fn on_reporting_room_redaction(&self, member: &RoomMember, redacted_event_id: &EventId) {
+        dbg!(&redacted_event_id);
+
         // Check if the sender is a editor (= has the permission to use emoji commands)
         if !self.is_editor(&member).await {
             return;
@@ -414,8 +416,15 @@ impl EventCallback {
             let mut news_store = self.0.news_store.lock().unwrap();
             let redacted_event_id = redacted_event_id.to_string();
 
+            // News entry itself
+            if let Ok(news) = news_store.remove_news(&redacted_event_id) {
+                Some(format!(
+                    "{}'s news entry got removed by {}",
+                    news.reporter_id,
+                    member.user_id().to_string(),
+                ))
             // News approval
-            if let Ok(news) = news_store.remove_news_approval(&redacted_event_id) {
+            } else if let Ok(news) = news_store.remove_news_approval(&redacted_event_id) {
                 let mut msg = format!(
                     "Editor {} removed their approval from {}'s news entry.",
                     member.user_id().to_string(),

@@ -55,6 +55,16 @@ impl NewsStore {
         self.write_data();
     }
 
+    pub fn remove_news(&mut self, redacted_event_id: &str) -> Result<News, Error> {
+        if let Some(news) = self.news_map.remove(redacted_event_id) {
+            debug!("Removed {:#?}", &news);
+            self.write_data();
+            return Ok(news);
+        }
+
+        Err(Error::NewsEventIdNotFound)
+    }
+
     pub fn update_news(
         &mut self,
         news_event_id: String,
