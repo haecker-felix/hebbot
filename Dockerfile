@@ -15,7 +15,7 @@ RUN cargo install --path .
 # Final stage
 
 FROM debian:stable-slim
-RUN apt-get update && apt-get -y install libssl-dev
+RUN apt-get update && apt-get -y install libssl-dev ca-certificates
 
 COPY --from=cargo-build /usr/local/cargo/bin/hebbot /bin
 
