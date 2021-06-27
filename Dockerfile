@@ -5,5 +5,5 @@ RUN dnf -y update && dnf -y install rust cargo openssl-devel libolm-devel cmake 
 WORKDIR app
 COPY . .
 
-RUN cargo build --release
+RUN USER=root cargo build --release
 CMD ["sh", "-c", "RUST_LOG=hebbot=debug target/release/hebbot"]
