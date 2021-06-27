@@ -4,15 +4,12 @@ version = "0.1.0"
 authors = ["Felix Häcker <haeckerfelix@gnome.org>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-matrix-sdk = { git="https://github.com/matrix-org/matrix-rust-sdk/" }
-matrix-sdk-common = { git="https://github.com/matrix-org/matrix-rust-sdk/" }
+ruma = { git = "https://github.com/haecker-felix/ruma/", branch = "patch-1", features = ["events"] }
+matrix-sdk = "0.3"
 serde = "1.0"
 serde_json = "1.0"
 url = "2.2"
-ruma = "0.1"
 tokio = { version="1.7", features = ["macros"] }
 async-trait = "0.1"
 log = "0.4"
@@ -21,3 +18,7 @@ chrono = "0.4"
 regex = "1.5"
 rand = "0.8"
 mime = "0.3"
+
+[patch.crates-io]
+ruma = { git = "https://github.com/haecker-felix/ruma/", branch = "patch-1", features = ["events"] }
+ruma-identifiers = { git ="https://github.com/haecker-felix/ruma/", branch = "patch-1", features = ["events"] }

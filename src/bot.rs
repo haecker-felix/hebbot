@@ -1,4 +1,3 @@
-use ruma::events::{room::message::MessageEventContent, AnyMessageEventContent};
 use matrix_sdk::room::Joined;
 use matrix_sdk::room::Room;
 use matrix_sdk::uuid::Uuid;
@@ -12,6 +11,7 @@ use ruma::events::room::message::FileMessageEventContent;
 use ruma::events::room::message::MessageType;
 use ruma::events::room::redaction::SyncRedactionEvent;
 use ruma::events::SyncMessageEvent;
+use ruma::events::{room::message::MessageEventContent, AnyMessageEventContent};
 use ruma::EventId;
 use ruma::MxcUri;
 use ruma::RoomId;

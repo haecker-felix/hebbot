@@ -18,7 +18,7 @@ pub struct Project {
     pub emoji: char,
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
     pub bot_user_id: String,
     pub bot_password: String,
