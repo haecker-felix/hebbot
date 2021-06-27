@@ -8,7 +8,6 @@ COPY Cargo.lock .
 COPY Cargo.toml .
 COPY ./src src
 
-#RUN cargo build --release
 RUN cargo install --path .
 
 
