@@ -1,11 +1,11 @@
-use matrix_sdk::events::{room::message::MessageEventContent, AnyMessageEventContent};
+use ruma::events::{room::message::MessageEventContent, AnyMessageEventContent};
 use matrix_sdk::room::Joined;
 use matrix_sdk::room::Room;
+use matrix_sdk::uuid::Uuid;
 use matrix_sdk::Client;
 use matrix_sdk::EventHandler;
 use matrix_sdk::RoomMember;
 use matrix_sdk::SyncSettings;
-use matrix_sdk_common::uuid::Uuid;
 use regex::Regex;
 use ruma::events::reaction::ReactionEventContent;
 use ruma::events::room::message::FileMessageEventContent;
@@ -90,8 +90,8 @@ impl Bot {
             .expect("Unable to sync");
 
         info!(
-            "Logged in as {}, got device_id {} and access_token {}",
-            response.user_id, response.device_id, response.access_token
+            "Logged in as {}, got device_id {}",
+            response.user_id, response.device_id
         );
     }
 
@@ -180,7 +180,7 @@ impl EventHandler for EventCallback {
     async fn on_room_reaction(&self, room: Room, event: &SyncMessageEvent<ReactionEventContent>) {
         if let Room::Joined(ref _joined) = room {
             let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
-            let relation = &event.content.relation;
+            let relation = &event.content.relates_to;
             let reaction_event_id = event.event_id.clone();
             let message_event_id = relation.event_id.clone();
 
@@ -587,7 +587,9 @@ impl EventCallback {
         // Don't print bot password
         config.bot_password = "".to_string();
 
-        let msg = format!("<pre><code>{:#?}</code></pre>\n", config);
+        let json = serde_json::to_string_pretty(&config).unwrap();
+
+        let msg = format!("<pre><code>{}</code></pre>\n", json);
         self.0.send_message(&msg, true, true).await;
     }
 
