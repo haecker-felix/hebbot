@@ -180,7 +180,7 @@ impl EventHandler for EventCallback {
     async fn on_room_reaction(&self, room: Room, event: &SyncMessageEvent<ReactionEventContent>) {
         if let Room::Joined(ref _joined) = room {
             let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
-            let relation = &event.content.relation;
+            let relation = &event.content.relates_to;
             let reaction_event_id = event.event_id.clone();
             let message_event_id = relation.event_id.clone();
 

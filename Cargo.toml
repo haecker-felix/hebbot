@@ -3,16 +3,17 @@ name = "hebbot"
 version = "0.1.0"
 authors = ["Felix Häcker <haeckerfelix@gnome.org>"]
 edition = "2018"
+include = ["src/**/*", "Cargo.toml"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-matrix-sdk = { git="https://github.com/matrix-org/matrix-rust-sdk/" }
-matrix-sdk-common = { git="https://github.com/matrix-org/matrix-rust-sdk/" }
+matrix-sdk = "0.3"
+matrix-sdk-common = "0.3"
 serde = "1.0"
 serde_json = "1.0"
 url = "2.2"
-ruma = "0.1"
+ruma = "0.2"
 tokio = { version="1.7", features = ["macros"] }
 async-trait = "0.1"
 log = "0.4"
