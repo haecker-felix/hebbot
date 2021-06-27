@@ -1,9 +1,22 @@
-# syntax=docker/dockerfile:1
-FROM fedora:35
-RUN dnf -y update && dnf -y install rust cargo openssl-devel libolm-devel cmake gcc-c++ && dnf clean all
+# Build stage
 
-WORKDIR app
-COPY . .
+FROM rust:1.53-buster as cargo-build
+RUN apt-get update && apt-get -y install libolm-dev cmake
 
-RUN USER=root cargo build --release
-CMD ["sh", "-c", "RUST_LOG=hebbot=debug target/release/hebbot"]
+WORKDIR /usr/src/hebbot
+COPY Cargo.lock .
+COPY Cargo.toml .
+COPY ./src src
+
+#RUN cargo build --release
+RUN cargo install --path .
+
+
+# Final stage
+
+FROM debian:stable-slim
+RUN apt-get update && apt-get -y install libssl-dev
+
+COPY --from=cargo-build /usr/local/cargo/bin/hebbot /bin
+
+CMD ["sh", "-c", "RUST_LOG=hebbot=debug hebbot"]
