@@ -37,7 +37,10 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
             insert_into_map(&mut section_map, &todo_section, news);
         } else {
             for section_emoji in sections {
-                let section = config.section_by_emoji(&section_emoji).unwrap();
+                let section = config.section_by_emoji(&section_emoji).expect(&format!(
+                    "Unable to find section by emoji: {:?}",
+                    section_emoji
+                ));
                 insert_into_map(&mut section_map, &section, news.clone());
             }
         }
@@ -80,7 +83,9 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
                 section_text += &news_text;
             } else {
                 for p in projects {
-                    let project = config.project_by_emoji(&p).unwrap();
+                    let project = config
+                        .project_by_emoji(&p)
+                        .expect(&format!("Unable to find project by emoji: {:?}", p));
                     let news_text = generate_news_text(&n, &project);
                     section_text += &news_text;
                 }
