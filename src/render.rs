@@ -25,15 +25,16 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
         // Filter out duplicated sections
         // (eg. two editors are adding the same section to a news entry)
         let mut sections = HashSet::new();
-        for section in news.sections.values().collect::<Vec<&char>>() {
-            sections.insert(section);
+        for section in news.sections.values().collect::<Vec<&String>>() {
+            let section_emoji = section.replace("\u{fe0f}", "");
+            sections.insert(section_emoji);
         }
 
         if sections.is_empty() {
             // For news entries without a section
             let todo_section = Section {
                 title: "TODO".into(),
-                emoji: '❔',
+                emoji: "❔".into(),
             };
             insert_into_map(&mut section_map, &todo_section, news);
         } else {
@@ -64,8 +65,9 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
             // Filter out duplicated project
             // (eg. two editors are adding the same project description to a news entry)
             let mut projects = HashSet::new();
-            for project in n.projects.values().collect::<Vec<&char>>() {
-                projects.insert(project);
+            for project in n.projects.values().collect::<Vec<&String>>() {
+                let project_emoji = project.replace("\u{fe0f}", "");
+                projects.insert(project_emoji);
             }
 
             if projects.is_empty() {

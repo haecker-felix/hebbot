@@ -21,9 +21,9 @@ pub struct News {
     pub reporter_id: String,
     pub reporter_display_name: String,
     pub message: String,
-    pub approvals: HashMap<String, char>,
-    pub sections: HashMap<String, char>,
-    pub projects: HashMap<String, char>,
+    pub approvals: HashMap<String, String>,
+    pub sections: HashMap<String, String>,
+    pub projects: HashMap<String, String>,
 }
 
 #[derive(Clone)]
@@ -89,7 +89,7 @@ impl NewsStore {
         &mut self,
         news_event_id: &str,
         reaction_event_id: &str,
-        reaction_emoji: char,
+        reaction_emoji: String,
     ) -> Result<News, Error> {
         self.add_news_emoji(
             EmojiType::Approval,
@@ -104,7 +104,7 @@ impl NewsStore {
         &mut self,
         news_event_id: &str,
         reaction_event_id: &str,
-        reaction_emoji: char,
+        reaction_emoji: String,
     ) -> Result<News, Error> {
         self.add_news_emoji(
             EmojiType::Section,
@@ -119,7 +119,7 @@ impl NewsStore {
         &mut self,
         news_event_id: &str,
         reaction_event_id: &str,
-        reaction_emoji: char,
+        reaction_emoji: String,
     ) -> Result<News, Error> {
         self.add_news_emoji(
             EmojiType::Project,
@@ -174,7 +174,7 @@ impl NewsStore {
         emoji_type: EmojiType,
         news_event_id: &str,
         reaction_event_id: &str,
-        reaction_emoji: char,
+        reaction_emoji: String,
     ) -> Result<News, Error> {
         if let Some(news) = self.news_map.get(news_event_id) {
             let mut updated_news = news.clone();

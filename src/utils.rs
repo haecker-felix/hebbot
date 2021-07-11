@@ -86,3 +86,10 @@ pub fn summary(message: &str) -> String {
         message.to_string()
     }
 }
+
+/// Returns `true` if the emojis are matching
+pub fn emoji_cmp(a: &str, b: &str) -> bool {
+    let a = &a.replace("\u{fe0f}", "");
+    let b = &b.replace("\u{fe0f}", "");
+    a == b
+}

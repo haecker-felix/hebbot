@@ -329,17 +329,16 @@ impl EventCallback {
 
         let message_event_id = message_event_id.to_string();
         let reaction_event_id = reaction_event_id.to_string();
-        let reaction_emoji = reaction_emoji.chars().collect::<Vec<char>>()[0];
         let approval_emoji = &self.0.config.approval_emoji;
         let link = self.message_link(message_event_id.clone());
 
         // Approval emoji
-        let message = if &reaction_emoji == approval_emoji {
+        let message = if utils::emoji_cmp(reaction_emoji, approval_emoji) {
             let mut news_store = self.0.news_store.lock().unwrap();
             let msg = match news_store.add_news_approval(
                 &message_event_id,
                 &reaction_event_id,
-                reaction_emoji,
+                reaction_emoji.into(),
             ) {
                 Ok(news) => format!(
                     "Editor {} approved {}'s news entry. ({})",
@@ -363,7 +362,7 @@ impl EventCallback {
             let msg = match news_store.add_news_section(
                 &message_event_id,
                 &reaction_event_id,
-                reaction_emoji,
+                reaction_emoji.into(),
             ) {
                 Ok(news) => format!(
                     "Editor {} added {}'s news entry ({}) to the \"{}\" section.",
@@ -389,7 +388,7 @@ impl EventCallback {
             let msg = match news_store.add_news_project(
                 &message_event_id,
                 &reaction_event_id,
-                reaction_emoji,
+                reaction_emoji.into(),
             ) {
                 Ok(news) => format!(
                     "Editor {} added the project description \"{}\" to {}'s news entry ({}).",
