@@ -516,31 +516,123 @@ impl EventCallback {
         info!("Received command: {} ({})", command, args);
 
         match command {
-            "!render-message" => self.render_message_command(member).await,
-            "!render-file" => self.render_file_command(member).await,
-            "!status" => self.status_command().await,
-            "!list-sections" => self.list_sections_command().await,
-            "!list-projects" => self.list_projects_command().await,
-            "!list-config" => self.list_config_command().await,
             "!clear" => self.clear_command().await,
             "!help" => self.help_command().await,
+            "!list-config" => self.list_config_command().await,
+            "!list-projects" => self.list_projects_command().await,
+            "!list-sections" => self.list_sections_command().await,
+            "!render-file" => self.render_file_command(member).await,
+            "!render-message" => self.render_message_command(member).await,
             "!say" => self.say_command(&args).await,
+            "!status" => self.status_command().await,
             _ => self.unrecognized_command().await,
         }
     }
 
     async fn help_command(&self) {
         let help = "Available commands: \n\n\
-            !render-message \n\
-            !render-file \n\
-            !status \n\
-            !list-sections \n\
-            !list-projects \n\
-            !list-config \n\
             !clear \n\
-            !say <message>";
+            !list-config \n\
+            !list-projects \n\
+            !list-sections \n\
+            !render-file \n\
+            !render-message \n\
+            !say <message>  \n\
+            !status";
 
         self.0.send_message(help, false, true).await;
+    }
+
+    async fn clear_command(&self) {
+        let msg = {
+            let mut news_store = self.0.news_store.lock().unwrap();
+
+            let news = news_store.get_news();
+            news_store.clear_news();
+
+            format!("Cleared {} news!", news.len())
+        };
+
+        self.0.send_message(&msg, false, true).await;
+    }
+
+    async fn list_config_command(&self) {
+        let mut config = self.0.config.clone();
+
+        // Don't print bot password
+        config.bot_password = "".to_string();
+
+        let json = serde_json::to_string_pretty(&config).unwrap();
+
+        let msg = format!("<pre><code>{}</code></pre>\n", json);
+        self.0.send_message(&msg, true, true).await;
+    }
+
+    async fn list_projects_command(&self) {
+        let config = self.0.config.clone();
+
+        let mut list = String::new();
+        for e in config.projects {
+            list += &format!(
+                "{}: {} - {} ({})\n",
+                e.emoji, e.title, e.description, e.repository
+            );
+        }
+
+        let msg = format!("List of projects:\n<pre><code>{}</code></pre>\n", list);
+        self.0.send_message(&msg, true, true).await;
+    }
+
+    async fn list_sections_command(&self) {
+        let config = self.0.config.clone();
+
+        let mut list = String::new();
+        for e in config.sections {
+            list += &format!("{}: {}\n", e.emoji, e.title);
+        }
+
+        let msg = format!("List of sections:\n<pre><code>{}</code></pre>\n", list);
+        self.0.send_message(&msg, true, true).await;
+    }
+
+    async fn render_file_command(&self, editor: &RoomMember) {
+        let rendered = {
+            let news_store = self.0.news_store.lock().unwrap();
+            let news = news_store.get_news();
+            let config = self.0.config.clone();
+
+            render::render(news, config, editor)
+        };
+        let mut bytes = rendered.as_bytes();
+
+        let response = self
+            .0
+            .client
+            .upload(&mime::TEXT_PLAIN_UTF_8, &mut bytes)
+            .await
+            .expect("Can't upload rendered file.");
+
+        self.0
+            .send_file(response.content_uri, "rendered.md".to_string(), true)
+            .await;
+    }
+
+    async fn render_message_command(&self, editor: &RoomMember) {
+        let rendered = {
+            let news_store = self.0.news_store.lock().unwrap();
+            let news = news_store.get_news();
+            let config = self.0.config.clone();
+
+            let r = render::render(news, config, editor);
+
+            format!("<pre><code>{}</code></pre>\n", r)
+        };
+
+        self.0.send_message(&rendered, true, true).await;
+    }
+
+    async fn say_command(&self, msg: &str) {
+        self.0.send_message(&msg, true, false).await;
     }
 
     async fn status_command(&self) {
@@ -576,98 +668,6 @@ impl EventCallback {
         };
 
         self.0.send_message(&msg, true, true).await;
-    }
-
-    async fn list_config_command(&self) {
-        let mut config = self.0.config.clone();
-
-        // Don't print bot password
-        config.bot_password = "".to_string();
-
-        let json = serde_json::to_string_pretty(&config).unwrap();
-
-        let msg = format!("<pre><code>{}</code></pre>\n", json);
-        self.0.send_message(&msg, true, true).await;
-    }
-
-    async fn list_sections_command(&self) {
-        let config = self.0.config.clone();
-
-        let mut list = String::new();
-        for e in config.sections {
-            list += &format!("{}: {}\n", e.emoji, e.title);
-        }
-
-        let msg = format!("List of sections:\n<pre><code>{}</code></pre>\n", list);
-        self.0.send_message(&msg, true, true).await;
-    }
-
-    async fn list_projects_command(&self) {
-        let config = self.0.config.clone();
-
-        let mut list = String::new();
-        for e in config.projects {
-            list += &format!(
-                "{}: {} - {} ({})\n",
-                e.emoji, e.title, e.description, e.repository
-            );
-        }
-
-        let msg = format!("List of projects:\n<pre><code>{}</code></pre>\n", list);
-        self.0.send_message(&msg, true, true).await;
-    }
-
-    async fn render_message_command(&self, editor: &RoomMember) {
-        let rendered = {
-            let news_store = self.0.news_store.lock().unwrap();
-            let news = news_store.get_news();
-            let config = self.0.config.clone();
-
-            let r = render::render(news, config, editor);
-
-            format!("<pre><code>{}</code></pre>\n", r)
-        };
-
-        self.0.send_message(&rendered, true, true).await;
-    }
-
-    async fn render_file_command(&self, editor: &RoomMember) {
-        let rendered = {
-            let news_store = self.0.news_store.lock().unwrap();
-            let news = news_store.get_news();
-            let config = self.0.config.clone();
-
-            render::render(news, config, editor)
-        };
-        let mut bytes = rendered.as_bytes();
-
-        let response = self
-            .0
-            .client
-            .upload(&mime::TEXT_PLAIN_UTF_8, &mut bytes)
-            .await
-            .expect("Can't upload rendered file.");
-
-        self.0
-            .send_file(response.content_uri, "rendered.md".to_string(), true)
-            .await;
-    }
-
-    async fn clear_command(&self) {
-        let msg = {
-            let mut news_store = self.0.news_store.lock().unwrap();
-
-            let news = news_store.get_news();
-            news_store.clear_news();
-
-            format!("Cleared {} news!", news.len())
-        };
-
-        self.0.send_message(&msg, false, true).await;
-    }
-
-    async fn say_command(&self, msg: &str) {
-        self.0.send_message(&msg, true, false).await;
     }
 
     async fn unrecognized_command(&self) {
