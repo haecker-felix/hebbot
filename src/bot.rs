@@ -17,6 +17,8 @@ use ruma::RoomId;
 use ruma::UserId;
 
 use std::convert::TryFrom;
+use std::os::unix::process::CommandExt;
+use std::process::Command;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -523,6 +525,7 @@ impl EventCallback {
             "!list-sections" => self.list_sections_command().await,
             "!render-file" => self.render_file_command(member).await,
             "!render-message" => self.render_message_command(member).await,
+            "!restart" => self.restart_command().await,
             "!say" => self.say_command(&args).await,
             "!status" => self.status_command().await,
             _ => self.unrecognized_command().await,
@@ -537,6 +540,7 @@ impl EventCallback {
             !list-sections \n\
             !render-file \n\
             !render-message \n\
+            !restart \n\
             !say <message>  \n\
             !status";
 
@@ -629,6 +633,13 @@ impl EventCallback {
         };
 
         self.0.send_message(&rendered, true, true).await;
+    }
+
+    async fn restart_command(&self) {
+        self.0
+            .send_message("Restarting hebbot...", false, true)
+            .await;
+        Command::new("/proc/self/exe").exec();
     }
 
     async fn say_command(&self, msg: &str) {
