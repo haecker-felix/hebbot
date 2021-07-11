@@ -5,20 +5,7 @@ use std::fs::File;
 use std::io::Read;
 
 use crate::utils;
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub struct Section {
-    pub title: String,
-    pub emoji: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub struct Project {
-    pub title: String,
-    pub description: String,
-    pub repository: String,
-    pub emoji: String,
-}
+use crate::{Project, Section};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {

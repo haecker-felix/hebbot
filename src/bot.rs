@@ -20,10 +20,9 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crate::config::Config;
 use crate::render;
-use crate::store::{News, NewsStore};
 use crate::utils;
+use crate::{Config, News, NewsStore};
 
 #[derive(Clone)]
 pub struct Bot {

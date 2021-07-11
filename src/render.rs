@@ -7,10 +7,8 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 
-use crate::config::Config;
-use crate::config::{Project, Section};
-use crate::store::News;
 use crate::utils;
+use crate::{Config, News, Project, Section};
 
 pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> String {
     let mut section_map: HashMap<Section, Vec<News>> = HashMap::new();

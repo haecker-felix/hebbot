@@ -1,29 +1,16 @@
-use serde::{Deserialize, Serialize};
-
 use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
 
-use crate::error::Error;
+use crate::{Error, News};
 
 #[derive(Clone, Debug)]
 enum EmojiType {
     Approval,
     Section,
     Project,
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-pub struct News {
-    pub event_id: String,
-    pub reporter_id: String,
-    pub reporter_display_name: String,
-    pub message: String,
-    pub approvals: HashMap<String, String>,
-    pub sections: HashMap<String, String>,
-    pub projects: HashMap<String, String>,
 }
 
 #[derive(Clone)]
