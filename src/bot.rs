@@ -608,7 +608,10 @@ impl EventCallback {
 
         let mut list = String::new();
         for e in config.projects {
-            list += &format!("{}: {}\n", e.emoji, e.title);
+            list += &format!(
+                "{}: {} - {} ({})\n",
+                e.emoji, e.title, e.description, e.repository
+            );
         }
 
         let msg = format!("List of projects:\n<pre><code>{}</code></pre>\n", list);
