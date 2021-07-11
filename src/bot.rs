@@ -5,7 +5,6 @@ use matrix_sdk::Client;
 use matrix_sdk::EventHandler;
 use matrix_sdk::RoomMember;
 use matrix_sdk::SyncSettings;
-use regex::Regex;
 use ruma::events::reaction::ReactionEventContent;
 use ruma::events::room::message::FileMessageEventContent;
 use ruma::events::room::message::MessageType;
@@ -249,10 +248,7 @@ impl EventCallback {
             self.0.send_message(&msg, true, true).await;
 
             // remove bot name from message
-            let regex = format!("^@?{}(:{})?:?", bot.localpart(), bot.server_name());
-            let re = Regex::new(&regex).unwrap();
-            let message = re.replace(&message, "");
-            let message = message.trim().to_string();
+            let message = utils::remove_bot_name(&message, &bot);
 
             // Create new news entry...
             let news = News {
@@ -283,6 +279,9 @@ impl EventCallback {
         edited_msg_event_id: &EventId,
     ) {
         let event_id = edited_msg_event_id.to_string();
+        let bot = self.0.client.user_id().await.unwrap();
+        let updated_message = utils::remove_bot_name(&updated_message, &bot);
+
         let message = if let Ok(news) = self
             .0
             .news_store

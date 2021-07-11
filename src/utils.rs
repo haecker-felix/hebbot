@@ -1,4 +1,5 @@
 use matrix_sdk::BaseRoomMember;
+use regex::Regex;
 use ruma::events::room::message::MessageEventContent;
 use ruma::events::room::message::MessageType;
 use ruma::events::room::message::Relation;
@@ -92,4 +93,12 @@ pub fn emoji_cmp(a: &str, b: &str) -> bool {
     let a = &a.replace("\u{fe0f}", "");
     let b = &b.replace("\u{fe0f}", "");
     a == b
+}
+
+/// Remove bot name from message
+pub fn remove_bot_name(message: &str, bot: &UserId) -> String {
+    let regex = format!("^@?{}(:{})?:?", bot.localpart(), bot.server_name());
+    let re = Regex::new(&regex).unwrap();
+    let message = re.replace(&message, "");
+    message.trim().to_string()
 }
