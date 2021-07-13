@@ -11,15 +11,18 @@
 	"sections": [
                 {
                         "title": "New projects",
-                        "emoji": "⚙"
+                        "emoji": "⚙",
+                        "order": 100
                 },
                 {
                         "title": "Updated Apps",
-                        "emoji": "🔵"
+                        "emoji": "🔵",
+                        "order": 200
                 },
                 {
                         "title": "Interesting Projects",
-                        "emoji": "🛰"
+                        "emoji": "🛰",
+                        "order": 300
                 }
 
 	],

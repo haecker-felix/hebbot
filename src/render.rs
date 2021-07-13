@@ -1,7 +1,7 @@
 use matrix_sdk::RoomMember;
 use rand::Rng;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::env;
 use std::fs::File;
@@ -11,7 +11,7 @@ use crate::utils;
 use crate::{Config, News, Project, Section};
 
 pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> String {
-    let mut section_map: HashMap<Section, Vec<News>> = HashMap::new();
+    let mut section_map: BTreeMap<Section, Vec<News>> = BTreeMap::new();
     let mut project_names: HashSet<String> = HashSet::new();
     let mut report_text = String::new();
 
@@ -25,7 +25,6 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
     let mut template = String::new();
     file.read_to_string(&mut template)
         .expect("Unable to read template file");
-
 
     // Sort news entries into sections
     for news in news_list {
@@ -47,6 +46,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
             let todo_section = Section {
                 title: "TODO".into(),
                 emoji: "❔".into(),
+                order: 0,
             };
             insert_into_map(&mut section_map, &todo_section, news);
         } else {
@@ -124,7 +124,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
     template
 }
 
-fn insert_into_map(section_map: &mut HashMap<Section, Vec<News>>, section: &Section, news: News) {
+fn insert_into_map(section_map: &mut BTreeMap<Section, Vec<News>>, section: &Section, news: News) {
     if let Some(entries) = section_map.get_mut(&section) {
         entries.insert(0, news);
     } else {
