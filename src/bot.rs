@@ -239,13 +239,13 @@ impl EventCallback {
         // Check min message length
         if message.len() > 30 {
             let msg = format!(
-                "Thanks for the report {}, I'll store your update!",
+                "✅ Thanks for the report {}, I'll store your update!",
                 reporter_display_name
             );
             self.0.send_message(&msg, false, false).await;
 
             let link = self.message_link(event_id.to_string());
-            let msg = format!("{} submitted a news entry. [{}]", member.user_id(), link);
+            let msg = format!("✅ {} submitted a news entry. [{}]", member.user_id(), link);
             self.0.send_message(&msg, true, true).await;
 
             // remove bot name from message
@@ -264,7 +264,7 @@ impl EventCallback {
             self.0.news_store.lock().unwrap().add_news(news);
         } else {
             let msg = format!(
-                "{}: Your update is too short and was not stored. This limitation was set-up to limit spam.",
+                "❌ {}: Your update is too short and was not stored. This limitation was set-up to limit spam.",
                 reporter_display_name
             );
             self.0.send_message(&msg, false, false).await;
@@ -293,7 +293,7 @@ impl EventCallback {
             if !news.approvals.is_empty() {
                 let link = self.message_link(edited_msg_event_id.to_string());
                 let msg = format!(
-                    "The news entry by {} got edited ({}). Check the new text, and make sure if you want to keep the approval.",
+                    "✅ The news entry by {} got edited ({}). Check the new text, and make sure if you want to keep the approval.",
                     news.reporter_id,
                     link
                 );
@@ -341,13 +341,13 @@ impl EventCallback {
                 reaction_emoji.into(),
             ) {
                 Ok(news) => format!(
-                    "Editor {} approved {}'s news entry. ({})",
+                    "✅ Editor {} approved {}'s news entry. ({})",
                     reaction_sender.user_id().to_string(),
                     news.reporter_id,
                     link
                 ),
                 Err(err) => format!(
-                    "Unable to add {}'s news approval ({}): {:?}\n(ID {})",
+                    "❌ Unable to add {}'s news approval ({}): {:?}\n(ID {})",
                     reaction_sender.user_id().to_string(),
                     link,
                     err,
@@ -365,14 +365,14 @@ impl EventCallback {
                 reaction_emoji.into(),
             ) {
                 Ok(news) => format!(
-                    "Editor {} added {}'s news entry ({}) to the \"{}\" section.",
+                    "✅ Editor {} added {}'s news entry ({}) to the \"{}\" section.",
                     reaction_sender.user_id().to_string(),
                     news.reporter_id,
                     link,
                     section.title
                 ),
                 Err(err) => format!(
-                    "Unable to add {}'s news entry ({}) to the {} section: {:?}\n(ID {})",
+                    "❌ Unable to add {}'s news entry ({}) to the {} section: {:?}\n(ID {})",
                     reaction_sender.user_id().to_string(),
                     link,
                     section.title,
@@ -391,14 +391,14 @@ impl EventCallback {
                 reaction_emoji.into(),
             ) {
                 Ok(news) => format!(
-                    "Editor {} added the project description \"{}\" to {}'s news entry ({}).",
+                    "✅ Editor {} added the project description \"{}\" to {}'s news entry ({}).",
                     reaction_sender.user_id().to_string(),
                     project.display_name,
                     news.reporter_id,
                     link
                 ),
                 Err(err) => format!(
-                    "Unable to add project description \"{}\"  to {}'s news entry ({}): {:?}\n(ID {})",
+                    "❌ Unable to add project description \"{}\"  to {}'s news entry ({}): {:?}\n(ID {})",
                     project.display_name,
                     reaction_sender.user_id().to_string(),
                     link,
@@ -440,14 +440,14 @@ impl EventCallback {
             // News entry itself
             if let Ok(news) = news_store.remove_news(&redacted_event_id) {
                 Some(format!(
-                    "{}'s news entry got removed by {}",
+                    "✅ {}'s news entry got removed by {}",
                     news.reporter_id,
                     member.user_id().to_string()
                 ))
             // News approval
             } else if let Ok(news) = news_store.remove_news_approval(&redacted_event_id) {
                 let mut msg = format!(
-                    "Editor {} removed their approval from {}'s news entry ({}).",
+                    "✅ Editor {} removed their approval from {}'s news entry ({}).",
                     member.user_id().to_string(),
                     news.reporter_id,
                     link
@@ -462,7 +462,7 @@ impl EventCallback {
             // News section
             } else if let Ok(news) = news_store.remove_news_section(&redacted_event_id) {
                 Some(format!(
-                    "Editor {} removed a section from {}'s news entry ({}).",
+                    "✅ Editor {} removed a section from {}'s news entry ({}).",
                     member.user_id().to_string(),
                     news.reporter_id,
                     link
@@ -471,7 +471,7 @@ impl EventCallback {
             // News project
             } else if let Ok(news) = news_store.remove_news_project(&redacted_event_id) {
                 Some(format!(
-                    "Editor {} removed a project from {}'s news entry ({}).",
+                    "✅ Editor {} removed a project from {}'s news entry ({}).",
                     member.user_id().to_string(),
                     news.reporter_id,
                     link

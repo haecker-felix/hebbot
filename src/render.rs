@@ -1,6 +1,6 @@
+use chrono::Datelike;
 use matrix_sdk::RoomMember;
 use rand::Rng;
-use chrono::Datelike;
 
 use std::collections::BTreeMap;
 use std::collections::HashSet;
@@ -174,7 +174,7 @@ fn prepare_message(msg: String) -> String {
 
 fn random_verb() -> String {
     let mut rng = rand::thread_rng();
-    let verbs = vec!["reports", "said", "announces", "tells"];
+    let verbs = vec!["reports", "says", "announces", "tells"];
     let id = rng.gen_range(0..verbs.len());
     verbs[id].to_string()
 }
