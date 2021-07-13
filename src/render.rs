@@ -1,5 +1,6 @@
 use matrix_sdk::RoomMember;
 use rand::Rng;
+use chrono::Datelike;
 
 use std::collections::BTreeMap;
 use std::collections::HashSet;
@@ -101,24 +102,28 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
 
     // Editor user name / link
     let display_name = utils::get_member_display_name(editor);
-    let author = format!(
-        "[{}](https://matrix.to/#/{})",
-        display_name,
-        editor.user_id()
-    );
 
     // Date for the blog
     let now: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
-    let today = now.format("%Y-%m-%d");
+    let today = now.format("%Y-%m-%d").to_string();
+    let weeknumber = now.iso_week().week().to_string();
+
+    // Generate timespan text
+    let week_later = chrono::Utc::now() + chrono::Duration::days(7);
+    let start = now.format("%B %d").to_string();
+    let end = week_later.format("%B %d").to_string();
+    let timespan = format!("{} to {}", start, end);
 
     // Projects list (can be get used for hugo tags for example)
     let mut projects = format!("{:?}", &project_names);
     projects = projects.replace("{", "");
     projects = projects.replace("}", "");
 
+    template = template.replace("{{weeknumber}}", &weeknumber);
+    template = template.replace("{{timespan}}", &timespan);
     template = template.replace("{{projects}}", &projects);
-    template = template.replace("{{today}}", &today.to_string());
-    template = template.replace("{{author}}", &author);
+    template = template.replace("{{today}}", &today);
+    template = template.replace("{{author}}", &display_name);
     template = template.replace("{{report}}", &report_text);
 
     template

@@ -1,9 +1,16 @@
-# This Week in our Community {{today}}
+---
+title: "#{{weeknumber}} This Week in X"
+author: {{author}}
+date: {{today}}
+tags: [{{projects}}]
+categories: ["weekly-update"]
+draft: false
+---
 
-Welcome to weekly report! Today’s report was edited by {{author}}.
+Update on what happened across the X project in the week from {{timespan}}.
 
 {{report}}
 
-## That’s all for this week!
+# That’s all for this week!
 
 See you next week!
