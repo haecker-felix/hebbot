@@ -146,11 +146,11 @@ fn generate_news_text(news: &News, project: &Project) -> String {
     let message = prepare_message(news.message.clone());
 
     let news_text = format!(
-        "### {}\n\n\
+        "### {} [🡽]({})\n\n\
         {}\n\n\
         {} {}\n\n\
         {}\n\n",
-        project.display_name, project_text, user, verb, message
+        project.display_name, project.repository, project_text, user, verb, message
     );
 
     news_text
