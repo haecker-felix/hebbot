@@ -25,10 +25,18 @@
 	],
 	"projects": [
                 {
-                        "title": "Radio Player",
-			"description": "With {{project}} you can listen to internet radio stations.",
-                        "repository": "https://gitlab.domain.org/userid/radio-player",
+                	"name": "shortwave",
+                	"display_name": "Shortwave",
+			"description": "{{project}} is an internet radio player that provides access to a database with over 25000 stations.",
+                        "repository": "https://gitlab.gnome.org/World/Shortwave",
 			"emoji": "📻"
+                },
+                {
+                	"name": "fragments",
+                	"display_name": "Fragments",
+			"description": "{{project}} is an easy to use BitTorrent client.",
+                        "repository": "https://gitlab.gnome.org/World/Fragments",
+			"emoji": "↙"
                 }
         ]
 

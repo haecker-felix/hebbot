@@ -393,13 +393,13 @@ impl EventCallback {
                 Ok(news) => format!(
                     "Editor {} added the project description \"{}\" to {}'s news entry ({}).",
                     reaction_sender.user_id().to_string(),
-                    project.title,
+                    project.display_name,
                     news.reporter_id,
                     link
                 ),
                 Err(err) => format!(
                     "Unable to add project description \"{}\"  to {}'s news entry ({}): {:?}\n(ID {})",
-                    project.title,
+                    project.display_name,
                     reaction_sender.user_id().to_string(),
                     link,
                     err,
@@ -579,7 +579,7 @@ impl EventCallback {
         for e in config.projects {
             list += &format!(
                 "{}: {} - {} ({})\n",
-                e.emoji, e.title, e.description, e.repository
+                e.emoji, e.display_name, e.description, e.repository
             );
         }
 
