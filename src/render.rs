@@ -109,7 +109,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
     let weeknumber = now.iso_week().week().to_string();
 
     // Generate timespan text
-    let week_later = chrono::Utc::now() + chrono::Duration::days(7);
+    let week_later = chrono::Utc::now() - chrono::Duration::days(7);
     let start = now.format("%B %d").to_string();
     let end = week_later.format("%B %d").to_string();
     let timespan = format!("{} to {}", start, end);
