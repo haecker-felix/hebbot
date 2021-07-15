@@ -74,10 +74,10 @@ pub fn get_member_display_name(member: &BaseRoomMember) -> String {
 /// Checks if a message starts with a user_id mention
 /// Automatically handles @ in front of the name
 pub fn msg_starts_with_mention(user_id: UserId, msg: String) -> bool {
-    let localpart = user_id.localpart();
+    let localpart = user_id.localpart().to_lowercase();
     // Catch "@botname ..." messages
-    let msg = msg.replace(&format!("@{}", localpart), localpart);
-    msg.as_str().starts_with(localpart)
+    let msg = msg.replace(&format!("@{}", localpart), &localpart);
+    msg.as_str().to_lowercase().starts_with(&localpart)
 }
 
 pub fn summary(message: &str) -> String {
