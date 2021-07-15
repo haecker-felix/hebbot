@@ -110,8 +110,8 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
 
     // Generate timespan text
     let week_later = chrono::Utc::now() - chrono::Duration::days(7);
-    let start = now.format("%B %d").to_string();
-    let end = week_later.format("%B %d").to_string();
+    let end = now.format("%B %d").to_string();
+    let start = week_later.format("%B %d").to_string();
     let timespan = format!("{} to {}", start, end);
 
     // Projects list (can be get used for hugo tags for example)
