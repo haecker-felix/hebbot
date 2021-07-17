@@ -97,7 +97,7 @@ pub fn emoji_cmp(a: &str, b: &str) -> bool {
 
 /// Remove bot name from message
 pub fn remove_bot_name(message: &str, bot: &UserId) -> String {
-    let regex = format!("^@?{}(:{})?:?", bot.localpart(), bot.server_name());
+    let regex = format!("(?i)^@?{}(:{})?:?", bot.localpart(), bot.server_name());
     let re = Regex::new(&regex).unwrap();
     let message = re.replace(&message, "");
     message.trim().to_string()
