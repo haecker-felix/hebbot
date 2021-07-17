@@ -46,4 +46,6 @@ The configuration files have to be placed in the `hebbot_data` volume.
 
 
 ### Example usage
-Hebbot gets used to generate the weekly GNOME summaries ("This Week in GNOME"). More information, and usage examples can be found here: TODO - insert blog post link here.
+Hebbot gets used to generate the weekly GNOME summaries ("This Week in GNOME"). More information, and usage examples can be found here: 
+- https://blogs.gnome.org/haeckerfelix/2021/07/16/introducing-this-week-in-gnome/
+- https://thisweek.gnome.org/
