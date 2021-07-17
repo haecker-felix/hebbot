@@ -5,6 +5,6 @@ pub struct Project {
     pub name: String,
     pub display_name: String,
     pub description: String,
-    pub repository: String,
+    pub website: String,
     pub emoji: String,
 }

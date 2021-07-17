@@ -579,7 +579,7 @@ impl EventCallback {
         for e in config.projects {
             list += &format!(
                 "{}: {} - {} ({})\n",
-                e.emoji, e.display_name, e.description, e.repository
+                e.emoji, e.display_name, e.description, e.website
             );
         }
 

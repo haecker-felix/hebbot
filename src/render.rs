@@ -145,7 +145,7 @@ fn generate_news_text(news: &News, project: &Project) -> String {
         news.reporter_display_name, news.reporter_id
     );
 
-    let project_repo = format!("[{}]({})", project.display_name, project.repository);
+    let project_repo = format!("[{}]({})", project.display_name, project.website);
     let project_text = project.description.replace("{{project}}", &project_repo);
     let verb = random_verb();
     let message = prepare_message(news.message.clone());
@@ -155,7 +155,7 @@ fn generate_news_text(news: &News, project: &Project) -> String {
         {}\n\n\
         {} {}\n\n\
         {}\n\n",
-        project.display_name, project.repository, project_text, user, verb, message
+        project.display_name, project.website, project_text, user, verb, message
     );
 
     news_text
