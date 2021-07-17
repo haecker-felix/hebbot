@@ -3,8 +3,9 @@ use std::cmp::Ordering;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Default, PartialOrd)]
 pub struct Section {
-    pub title: String,
     pub emoji: String,
+    pub name: String,
+    pub title: String,
     pub order: u32,
 }
 

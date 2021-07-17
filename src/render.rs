@@ -45,8 +45,9 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
         if sections.is_empty() {
             // For news entries without a section
             let todo_section = Section {
-                title: "TODO".into(),
                 emoji: "❔".into(),
+                name: "todo".into(),
+                title: "TODO".into(),
                 order: 0,
             };
             insert_into_map(&mut section_map, &todo_section, news);
@@ -77,7 +78,8 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
             if news_projects.is_empty() {
                 // For news entries without a project
                 let project = Project {
-                    display_name: "TODO: Unknown project!".into(),
+                    title: "TODO: Unknown project!".into(),
+                    name: "todo".into(),
                     description: "TODO: This message was not annotated with a project description."
                         .into(),
                     ..Default::default()
@@ -145,7 +147,7 @@ fn generate_news_text(news: &News, project: &Project) -> String {
         news.reporter_display_name, news.reporter_id
     );
 
-    let project_repo = format!("[{}]({})", project.display_name, project.website);
+    let project_repo = format!("[{}]({})", project.title, project.website);
     let project_text = project.description.replace("{{project}}", &project_repo);
     let verb = random_verb();
     let message = prepare_message(news.message.clone());
@@ -155,7 +157,7 @@ fn generate_news_text(news: &News, project: &Project) -> String {
         {}\n\n\
         {} {}\n\n\
         {}\n\n",
-        project.display_name, project.website, project_text, user, verb, message
+        project.title, project.website, project_text, user, verb, message
     );
 
     news_text
