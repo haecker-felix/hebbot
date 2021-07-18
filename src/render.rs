@@ -30,18 +30,11 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
     // Sort news entries into sections
     for news in news_list {
         // skip not approved news
-        if news.approvals.is_empty() {
+        if !news.is_approved() {
             continue;
         }
 
-        // Filter out duplicated sections
-        // (eg. two editors are adding the same section to a news entry)
-        let mut sections = HashSet::new();
-        for section in news.sections.values().collect::<Vec<&String>>() {
-            let section_emoji = section.replace("\u{fe0f}", "");
-            sections.insert(section_emoji);
-        }
-
+        let sections = news.section_names();
         if sections.is_empty() {
             // For news entries without a section
             let todo_section = Section {
@@ -52,10 +45,10 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
             };
             insert_into_map(&mut section_map, &todo_section, news);
         } else {
-            for section_emoji in sections {
-                let section = config.section_by_emoji(&section_emoji).expect(&format!(
-                    "Unable to find section by emoji: {:?}",
-                    section_emoji
+            for section_name in sections {
+                let section = config.section_by_name(&section_name).expect(&format!(
+                    "Unable to find section by name: {:?}",
+                    section_name
                 ));
                 insert_into_map(&mut section_map, &section, news.clone());
             }
@@ -69,12 +62,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
         for n in news {
             // Filter out duplicated project
             // (eg. two editors are adding the same project description to a news entry)
-            let mut news_projects = HashSet::new();
-            for project in n.projects.values().collect::<Vec<&String>>() {
-                let project_emoji = project.replace("\u{fe0f}", "");
-                news_projects.insert(project_emoji);
-            }
-
+            let news_projects = n.project_names();
             if news_projects.is_empty() {
                 // For news entries without a project
                 let project = Project {
@@ -89,8 +77,8 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Stri
             } else {
                 for p in news_projects {
                     let project = config
-                        .project_by_emoji(&p)
-                        .expect(&format!("Unable to find project by emoji: {:?}", p));
+                        .project_by_name(&p)
+                        .expect(&format!("Unable to find project by name: {:?}", p));
                     project_names.insert(project.name.clone());
                     let news_text = generate_news_text(&n, &project);
                     section_text += &news_text;
@@ -150,7 +138,7 @@ fn generate_news_text(news: &News, project: &Project) -> String {
     let project_repo = format!("[{}]({})", project.title, project.website);
     let project_text = project.description.replace("{{project}}", &project_repo);
     let verb = random_verb();
-    let message = prepare_message(news.message.clone());
+    let message = prepare_message(news.message());
 
     let news_text = format!(
         "### {} [↗]({})\n\n\
