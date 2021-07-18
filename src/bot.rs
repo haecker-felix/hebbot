@@ -24,7 +24,7 @@ use std::sync::Mutex;
 
 use crate::render;
 use crate::utils;
-use crate::{Config, News, NewsStore};
+use crate::{Config, News, NewsStore, ReactionType};
 
 #[derive(Clone)]
 pub struct Bot {
@@ -252,13 +252,7 @@ impl EventCallback {
             let message = utils::remove_bot_name(&message, &bot);
 
             // Create new news entry...
-            let news = News {
-                event_id,
-                reporter_id,
-                reporter_display_name,
-                message,
-                ..Default::default()
-            };
+            let news = News::new(event_id, reporter_id, reporter_display_name, message);
 
             // ...and save it for the next report!
             self.0.news_store.lock().unwrap().add_news(news);
@@ -282,27 +276,26 @@ impl EventCallback {
         let event_id = edited_msg_event_id.to_string();
         let bot = self.0.client.user_id().await.unwrap();
         let updated_message = utils::remove_bot_name(&updated_message, &bot);
+        let link = self.message_link(edited_msg_event_id.to_string());
 
-        let message = if let Ok(news) = self
-            .0
-            .news_store
-            .lock()
-            .unwrap()
-            .update_news(event_id, updated_message)
-        {
-            if !news.approvals.is_empty() {
-                let link = self.message_link(edited_msg_event_id.to_string());
-                let msg = format!(
-                    "✅ The news entry by {} got edited ({}). Check the new text, and make sure if you want to keep the approval.",
-                    news.reporter_id,
-                    link
-                );
-                Some(msg)
+        let message = {
+            let news_store = self.0.news_store.lock().unwrap();
+            let msg = if let Some(news) = news_store.news_by_message_id(&event_id) {
+                news.set_message(updated_message);
+                if news.is_approved() {
+                    Some(format!(
+                        "✅ The news entry by {} got edited ({}). Check the new text, and make sure if you want to keep the approval.",
+                        news.reporter_id,
+                        link
+                    ))
+                } else {
+                    None
+                }
             } else {
                 None
-            }
-        } else {
-            None
+            };
+            news_store.write_data();
+            msg
         };
 
         if let Some(message) = message {
@@ -329,90 +322,86 @@ impl EventCallback {
 
         let message_event_id = message_event_id.to_string();
         let reaction_event_id = reaction_event_id.to_string();
-        let approval_emoji = &self.0.config.approval_emoji;
+
+        let reaction_type = self.0.config.reaction_type_by_emoji(&reaction_emoji);
         let link = self.message_link(message_event_id.clone());
 
-        // Approval emoji
-        let message = if utils::emoji_cmp(reaction_emoji, approval_emoji) {
-            let mut news_store = self.0.news_store.lock().unwrap();
-            let msg = match news_store.add_news_approval(
-                &message_event_id,
-                &reaction_event_id,
-                reaction_emoji.into(),
-            ) {
-                Ok(news) => format!(
-                    "✅ Editor {} approved {}'s news entry. ({})",
-                    reaction_sender.user_id().to_string(),
-                    news.reporter_id,
-                    link
-                ),
-                Err(err) => format!(
-                    "❌ Unable to add {}'s news approval ({}): {:?}\n(ID {})",
-                    reaction_sender.user_id().to_string(),
-                    link,
-                    err,
-                    message_event_id
-                ),
+        let message = {
+            let news_store = self.0.news_store.lock().unwrap();
+            let msg = if let Some(news) = news_store.news_by_message_id(&message_event_id) {
+                match reaction_type {
+                    ReactionType::Approval => {
+                        news.add_approval(reaction_event_id);
+                        Some(format!(
+                            "✅ Editor {} approved {}'s news entry. ({})",
+                            reaction_sender.user_id().to_string(),
+                            news.reporter_id,
+                            link
+                        ))
+                    }
+                    ReactionType::Section(section) => {
+                        let section = section.unwrap();
+                        news.add_section_name(reaction_event_id, section.name);
+                        Some(format!(
+                            "✅ Editor {} added {}'s news entry ({}) to the \"{}\" section.",
+                            reaction_sender.user_id().to_string(),
+                            news.reporter_id,
+                            link,
+                            section.title
+                        ))
+                    }
+                    ReactionType::Project(project) => {
+                        let project = project.unwrap();
+                        news.add_project_name(reaction_event_id, project.name);
+                        Some(format!(
+                            "✅ Editor {} added the project description \"{}\" to {}'s news entry ({}).",
+                            reaction_sender.user_id().to_string(),
+                            project.title,
+                            news.reporter_id,
+                            link
+                        ))
+                    }
+                    ReactionType::None => {
+                        debug!(
+                            "Ignore emoji reaction, doesn't match any known emoji ({:?})",
+                            reaction_emoji
+                        );
+                        None
+                    }
+                }
+            } else {
+                match reaction_type{
+                    ReactionType::Approval => Some(format!(
+                        "❌ Unable to add {}'s news approval ({}), message doesn't exists or isn't a news submission\n(ID {})",
+                        reaction_sender.user_id().to_string(),
+                        link,
+                        message_event_id
+                    )),
+                    ReactionType::Section(section) => Some(format!(
+                        "❌ Unable to add {}'s news entry ({}) to the {} section, message doesn't exists or isn't a news submission\n(ID {})",
+                        reaction_sender.user_id().to_string(),
+                        link,
+                        section.unwrap().title,
+                        message_event_id
+                    )),
+                    ReactionType::Project(project) => Some(format!(
+                        "❌ Unable to add project description \"{}\" to {}'s news entry ({}), message doesn't exists or isn't a news submission\n(ID {})",
+                        project.unwrap().title,
+                        reaction_sender.user_id().to_string(),
+                        link,
+                        message_event_id
+                    )),
+                    ReactionType::None => {
+                        debug!(
+                            "Ignore emoji reaction, doesn't match any known emoji and unable to find message ({:?})",
+                            reaction_emoji
+                        );
+                        None
+                    }
+                }
             };
-            Some(msg)
-
-        // Section emoji
-        } else if let Some(section) = &self.0.config.section_by_emoji(&reaction_emoji) {
-            let mut news_store = self.0.news_store.lock().unwrap();
-            let msg = match news_store.add_news_section(
-                &message_event_id,
-                &reaction_event_id,
-                reaction_emoji.into(),
-            ) {
-                Ok(news) => format!(
-                    "✅ Editor {} added {}'s news entry ({}) to the \"{}\" section.",
-                    reaction_sender.user_id().to_string(),
-                    news.reporter_id,
-                    link,
-                    section.title
-                ),
-                Err(err) => format!(
-                    "❌ Unable to add {}'s news entry ({}) to the {} section: {:?}\n(ID {})",
-                    reaction_sender.user_id().to_string(),
-                    link,
-                    section.title,
-                    err,
-                    message_event_id
-                ),
-            };
-            Some(msg)
-
-        // Project emoji
-        } else if let Some(project) = &self.0.config.project_by_emoji(&reaction_emoji) {
-            let mut news_store = self.0.news_store.lock().unwrap();
-            let msg = match news_store.add_news_project(
-                &message_event_id,
-                &reaction_event_id,
-                reaction_emoji.into(),
-            ) {
-                Ok(news) => format!(
-                    "✅ Editor {} added the project description \"{}\" to {}'s news entry ({}).",
-                    reaction_sender.user_id().to_string(),
-                    project.display_name,
-                    news.reporter_id,
-                    link
-                ),
-                Err(err) => format!(
-                    "❌ Unable to add project description \"{}\"  to {}'s news entry ({}): {:?}\n(ID {})",
-                    project.display_name,
-                    reaction_sender.user_id().to_string(),
-                    link,
-                    err,
-                    message_event_id
-                ),
-            };
-            Some(msg)
-        } else {
-            debug!(
-                "Ignore emoji reaction, doesn't match any known emoji ({:?})",
-                reaction_emoji
-            );
-            None
+            news_store.write_data();
+            msg
         };
 
         // Send confirm message to admin room
@@ -425,8 +414,6 @@ impl EventCallback {
     /// - Only redaction from editors are processed
     /// - Undo any reaction emoji "command" (eg. unapproving a news entry)
     async fn on_reporting_room_redaction(&self, member: &RoomMember, redacted_event_id: &EventId) {
-        dbg!(&redacted_event_id);
-
         // Check if the sender is a editor (= has the permission to use emoji commands)
         if !self.is_editor(&member).await {
             return;
@@ -437,52 +424,37 @@ impl EventCallback {
             let redacted_event_id = redacted_event_id.to_string();
             let link = self.message_link(redacted_event_id.clone());
 
-            // News entry itself
-            if let Ok(news) = news_store.remove_news(&redacted_event_id) {
+            // Redaction / deletion of the news entry itself
+            let msg = if let Ok(news) = news_store.remove_news(&redacted_event_id) {
                 Some(format!(
-                    "✅ {}'s news entry got removed by {}",
+                    "✅ {}'s news entry got deleted by {}",
                     news.reporter_id,
                     member.user_id().to_string()
                 ))
-            // News approval
-            } else if let Ok(news) = news_store.remove_news_approval(&redacted_event_id) {
-                let mut msg = format!(
-                    "✅ Editor {} removed their approval from {}'s news entry ({}).",
-                    member.user_id().to_string(),
-                    news.reporter_id,
-                    link
-                );
-
-                if news.approvals.is_empty() {
-                    msg += " This news entry doesn't have an approval anymore."
+            // Redaction of reaction events (approval, project, section)
+            } else if let Some(news) = news_store.news_by_reaction_id(&redacted_event_id.clone()) {
+                let reaction_type = news.remove_reaction_id(&redacted_event_id);
+                if reaction_type != ReactionType::None {
+                    Some(format!(
+                        "✅ Editor {} removed {} from {}'s news entry ({}).",
+                        member.user_id().to_string(),
+                        reaction_type,
+                        news.reporter_id,
+                        link
+                    ))
+                } else {
+                    debug!(
+                        "Ignore redaction, doesn't match any known emoji reaction event id (ID {:?})",
+                        redacted_event_id
+                    );
+                    None
                 }
-
-                Some(msg)
-
-            // News section
-            } else if let Ok(news) = news_store.remove_news_section(&redacted_event_id) {
-                Some(format!(
-                    "✅ Editor {} removed a section from {}'s news entry ({}).",
-                    member.user_id().to_string(),
-                    news.reporter_id,
-                    link
-                ))
-
-            // News project
-            } else if let Ok(news) = news_store.remove_news_project(&redacted_event_id) {
-                Some(format!(
-                    "✅ Editor {} removed a project from {}'s news entry ({}).",
-                    member.user_id().to_string(),
-                    news.reporter_id,
-                    link
-                ))
             } else {
-                debug!(
-                    "Ignore redaction, doesn't match any known emoji reaction event id (ID {:?})",
-                    redacted_event_id
-                );
                 None
-            }
+            };
+
+            news_store.write_data();
+            msg
         };
 
         // Send confirm message to admin room
@@ -551,7 +523,7 @@ impl EventCallback {
         let msg = {
             let mut news_store = self.0.news_store.lock().unwrap();
 
-            let news = news_store.get_news();
+            let news = news_store.news();
             news_store.clear_news();
 
             format!("Cleared {} news!", news.len())
@@ -579,7 +551,7 @@ impl EventCallback {
         for e in config.projects {
             list += &format!(
                 "{}: {} - {} ({})\n",
-                e.emoji, e.display_name, e.description, e.website
+                e.emoji, e.title, e.description, e.website
             );
         }
 
@@ -602,7 +574,7 @@ impl EventCallback {
     async fn render_file_command(&self, editor: &RoomMember) {
         let rendered = {
             let news_store = self.0.news_store.lock().unwrap();
-            let news = news_store.get_news();
+            let news = news_store.news();
             let config = self.0.config.clone();
 
             render::render(news, config, editor)
@@ -624,7 +596,7 @@ impl EventCallback {
     async fn render_message_command(&self, editor: &RoomMember) {
         let rendered = {
             let news_store = self.0.news_store.lock().unwrap();
-            let news = news_store.get_news();
+            let news = news_store.news();
             let config = self.0.config.clone();
 
             let r = render::render(news, config, editor);
@@ -649,7 +621,7 @@ impl EventCallback {
     async fn status_command(&self) {
         let msg = {
             let news_store = self.0.news_store.lock().unwrap();
-            let news = news_store.get_news();
+            let news = news_store.news();
 
             let mut approved_count = 0;
             let mut unapproved_count = 0;
@@ -657,11 +629,11 @@ impl EventCallback {
             let mut approved_list = String::new();
             let mut unapproved_list = String::new();
 
-            for n in news {
-                let link = self.message_link(n.event_id);
-                let summary = utils::summary(&n.message);
+            for n in &news {
+                let link = self.message_link(n.event_id.clone());
+                let summary = utils::summary(&n.message());
 
-                if !n.approvals.is_empty() {
+                if n.is_approved() {
                     approved_count += 1;
                     approved_list += &format!("- [{}] {}: {} <br>", link, n.reporter_id, summary);
                 } else {

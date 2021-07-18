@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::Read;
 
 use crate::utils;
-use crate::{Project, Section};
+use crate::{Project, ReactionType, Section};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
@@ -34,21 +34,43 @@ impl Config {
         serde_json::from_str(&data).expect("Unable to parse configuration file")
     }
 
-    pub fn section_by_emoji(&self, emoji: &str) -> Option<Section> {
+    pub fn section_by_name(&self, name: &str) -> Option<Section> {
         for section in &self.sections {
-            if utils::emoji_cmp(&section.emoji, emoji) {
+            if section.name == name {
                 return Some(section.clone());
             }
         }
         None
     }
 
-    pub fn project_by_emoji(&self, emoji: &str) -> Option<Project> {
+    pub fn project_by_name(&self, name: &str) -> Option<Project> {
         for project in &self.projects {
-            if utils::emoji_cmp(&project.emoji, emoji) {
+            if project.name == name {
                 return Some(project.clone());
             }
         }
         None
+    }
+
+    pub fn reaction_type_by_emoji(&self, emoji: &str) -> ReactionType {
+        if utils::emoji_cmp(&self.approval_emoji, emoji) {
+            return ReactionType::Approval;
+        } else {
+            // section
+            for section in &self.sections {
+                if utils::emoji_cmp(&section.emoji, emoji) {
+                    return ReactionType::Section(Some(section.clone()));
+                }
+            }
+
+            // project
+            for project in &self.projects {
+                if utils::emoji_cmp(&project.emoji, emoji) {
+                    return ReactionType::Project(Some(project.clone()));
+                }
+            }
+        }
+
+        ReactionType::None
     }
 }
