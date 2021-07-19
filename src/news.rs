@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use std::cell::RefCell;
@@ -5,11 +6,12 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ReactionType;
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct News {
     pub event_id: String,
     pub reporter_id: String,
     pub reporter_display_name: String,
+    pub timestamp: DateTime<Utc>,
     message: RefCell<String>,
     approvals: RefCell<HashSet<String>>,
     section_names: RefCell<HashMap<String, String>>,
@@ -27,6 +29,7 @@ impl News {
             event_id,
             reporter_id,
             reporter_display_name,
+            timestamp: chrono::Utc::now(),
             message: RefCell::new(message),
             approvals: RefCell::default(),
             section_names: RefCell::default(),
