@@ -495,8 +495,7 @@ impl EventCallback {
             "!list-config" => self.list_config_command().await,
             "!list-projects" => self.list_projects_command().await,
             "!list-sections" => self.list_sections_command().await,
-            "!render-file" => self.render_file_command(member).await,
-            "!render-message" => self.render_message_command(member).await,
+            "!render" => self.render_command(member).await,
             "!restart" => self.restart_command().await,
             "!say" => self.say_command(&args).await,
             "!status" => self.status_command().await,
@@ -510,8 +509,7 @@ impl EventCallback {
             !list-config \n\
             !list-projects \n\
             !list-sections \n\
-            !render-file \n\
-            !render-message \n\
+            !render \n\
             !restart \n\
             !say <message>  \n\
             !status";
@@ -571,16 +569,17 @@ impl EventCallback {
         self.0.send_message(&msg, true, true).await;
     }
 
-    async fn render_file_command(&self, editor: &RoomMember) {
-        let rendered = {
+    async fn render_command(&self, editor: &RoomMember) {
+        let result = {
             let news_store = self.0.news_store.lock().unwrap();
             let news = news_store.news();
             let config = self.0.config.clone();
 
             render::render(news, config, editor)
         };
-        let mut bytes = rendered.as_bytes();
 
+        // Upload rendered content as markdown file
+        let mut bytes = result.rendered.as_bytes();
         let response = self
             .0
             .client
@@ -588,23 +587,32 @@ impl EventCallback {
             .await
             .expect("Can't upload rendered file.");
 
+        // Warnings
+        let mut warnings = String::new();
+        for warning in &result.warnings {
+            warnings += &format!("- ⚠️ {}<br>", warning);
+        }
+
+        // Notes
+        let mut notes = String::new();
+        for note in &result.notes {
+            notes += &format!("- ℹ️ {}<br>", note);
+        }
+
+        // Send file
         self.0
             .send_file(response.content_uri, "rendered.md".to_string(), true)
             .await;
-    }
 
-    async fn render_message_command(&self, editor: &RoomMember) {
-        let rendered = {
-            let news_store = self.0.news_store.lock().unwrap();
-            let news = news_store.news();
-            let config = self.0.config.clone();
+        // Send warnings
+        if !result.warnings.is_empty() {
+            self.0.send_message(&warnings, true, true).await;
+        }
 
-            let r = render::render(news, config, editor);
-
-            format!("<pre><code>{}</code></pre>\n", r)
-        };
-
-        self.0.send_message(&rendered, true, true).await;
+        // Send notes
+        if !result.notes.is_empty() {
+            self.0.send_message(&notes, true, true).await;
+        }
     }
 
     async fn restart_command(&self) {
