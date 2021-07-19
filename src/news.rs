@@ -51,12 +51,7 @@ impl News {
     }
 
     pub fn section_names(&self) -> Vec<String> {
-        let mut names: Vec<String> = self
-            .section_names
-            .borrow()
-            .values()
-            .map(|s| s.clone())
-            .collect();
+        let mut names: Vec<String> = self.section_names.borrow().values().cloned().collect();
         names.sort();
         names.dedup();
         names
@@ -67,12 +62,7 @@ impl News {
     }
 
     pub fn project_names(&self) -> Vec<String> {
-        let mut names: Vec<String> = self
-            .project_names
-            .borrow()
-            .values()
-            .map(|s| s.clone())
-            .collect();
+        let mut names: Vec<String> = self.project_names.borrow().values().cloned().collect();
         names.sort();
         names.dedup();
         names
@@ -82,7 +72,7 @@ impl News {
         self.project_names.borrow_mut().insert(event_id, emoji);
     }
 
-    pub fn remove_reaction_id(&self, event_id: &String) -> ReactionType {
+    pub fn remove_reaction_id(&self, event_id: &str) -> ReactionType {
         if self.approvals.borrow_mut().remove(event_id) {
             ReactionType::Approval
         } else if self.section_names.borrow_mut().remove(event_id).is_some() {
@@ -94,18 +84,18 @@ impl News {
         }
     }
 
-    pub fn relates_to_reaction_id(&self, reaction_id: &String) -> bool {
+    pub fn relates_to_reaction_id(&self, reaction_id: &str) -> bool {
         for i in &*self.approvals.borrow() {
             if i == reaction_id {
                 return true;
             }
         }
-        for (i, _) in &*self.section_names.borrow() {
+        for i in self.section_names.borrow().keys() {
             if i == reaction_id {
                 return true;
             }
         }
-        for (i, _) in &*self.project_names.borrow() {
+        for i in self.project_names.borrow().keys() {
             if i == reaction_id {
                 return true;
             }

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Default, PartialOrd)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct Section {
     pub emoji: String,
     pub name: String,
@@ -9,8 +9,8 @@ pub struct Section {
     pub order: u32,
 }
 
-impl Ord for Section {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.order.cmp(&other.order)
+impl PartialOrd for Section {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.order.cmp(&other.order))
     }
 }

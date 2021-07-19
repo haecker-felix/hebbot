@@ -34,7 +34,7 @@ impl NewsStore {
         self.write_data();
     }
 
-    pub fn remove_news(&mut self, event_id: &String) -> Result<News, Error> {
+    pub fn remove_news(&mut self, event_id: &str) -> Result<News, Error> {
         if let Some(news) = self.news_map.remove(event_id) {
             debug!("Removed {:#?}", &news);
             self.write_data();
@@ -52,8 +52,8 @@ impl NewsStore {
         self.news_map.get(message_event_id)
     }
 
-    pub fn news_by_reaction_id(&self, reaction_event_id: &String) -> Option<&News> {
-        for (_, n) in &self.news_map {
+    pub fn news_by_reaction_id(&self, reaction_event_id: &str) -> Option<&News> {
+        for n in self.news_map.values() {
             if n.relates_to_reaction_id(reaction_event_id) {
                 return Some(n);
             }
