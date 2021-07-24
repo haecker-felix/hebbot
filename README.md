@@ -19,7 +19,7 @@ Contextual commands are executed in the form of emoji reactions.  For example, a
 ### Configuration
 In order to use the bot, two configuration files are required. The `config.json` configuration file contains the basic bot settings (e.g. username/password, room ids, ...) and the definitions for the sections and projects. The second configuration file `template.md` serves as a template for the actual summary, which can be generated later. 
 
-For both configuration files, examples are available that can be used as templates (`.example` files). 
+For both configuration files, examples are available that can be used as templates (`configuration/*.example` files). 
 
 ### Deployment
 The bot is available as [docker image](https://hub.docker.com/r/haeckerfelix/hebbot).
