@@ -188,7 +188,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
         // First add news without project information
         for news in render_section.news {
-            report_text += &news_md(&news);
+            report_text += &news_md(&news, &config);
         }
 
         // Then add projects
@@ -205,7 +205,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
             report_text += &project_md;
 
             for news in render_project.news {
-                report_text += &news_md(&news);
+                report_text += &news_md(&news, &config);
             }
         }
     }
@@ -277,7 +277,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     }
 }
 
-fn news_md(news: &News) -> String {
+fn news_md(news: &News, config: &Config) -> String {
     let user = format!(
         "[{}](https://matrix.to/#/{})",
         news.reporter_display_name, news.reporter_id
@@ -294,11 +294,11 @@ fn news_md(news: &News) -> String {
 
     // Insert images/videos into markdown > quote
     for (filename, _) in news.images() {
-        let image = format!(">\n> ![]({})\n", filename);
+        let image = config.image_markdown.replace("{{file}}", &filename);
         news_md += &image;
     }
     for (filename, _) in news.videos() {
-        let video = format!(">\n> {{< video src=\"{}\" >}}\n", filename);
+        let video = config.video_markdown.replace("{{file}}", &filename);
         news_md += &video;
     }
 
