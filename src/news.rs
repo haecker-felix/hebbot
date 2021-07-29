@@ -1,12 +1,14 @@
 use chrono::{DateTime, Utc};
+use ruma::MxcUri;
 use serde::{Deserialize, Serialize};
 
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
 use crate::ReactionType;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct News {
     pub event_id: String,
     pub reporter_id: String,
@@ -16,6 +18,8 @@ pub struct News {
     approvals: RefCell<HashSet<String>>,
     section_names: RefCell<HashMap<String, String>>,
     project_names: RefCell<HashMap<String, String>>,
+    images: RefCell<HashMap<String, (String, MxcUri)>>,
+    videos: RefCell<HashMap<String, (String, MxcUri)>>,
 }
 
 impl News {
@@ -34,11 +38,21 @@ impl News {
             approvals: RefCell::default(),
             section_names: RefCell::default(),
             project_names: RefCell::default(),
+            images: RefCell::default(),
+            videos: RefCell::default(),
         }
     }
 
     pub fn message(&self) -> String {
         self.message.borrow().clone()
+    }
+
+    pub fn message_summary(&self) -> String {
+        if self.message.borrow().len() > 60 {
+            format!("{} ...", self.message.borrow().clone().split_at(50).0)
+        } else {
+            self.message.borrow().clone()
+        }
     }
 
     pub fn set_message(&self, message: String) {
@@ -75,6 +89,42 @@ impl News {
         self.project_names.borrow_mut().insert(event_id, emoji);
     }
 
+    pub fn images(&self) -> Vec<(String, MxcUri)> {
+        Self::files(&*self.images.borrow())
+    }
+
+    pub fn add_image(&self, event_id: String, filename: String, mxc_uri: MxcUri) {
+        self.images
+            .borrow_mut()
+            .insert(event_id, (filename, mxc_uri));
+    }
+
+    pub fn videos(&self) -> Vec<(String, MxcUri)> {
+        Self::files(&*self.videos.borrow())
+    }
+
+    pub fn add_video(&self, event_id: String, filename: String, mxc_uri: MxcUri) {
+        self.videos
+            .borrow_mut()
+            .insert(event_id, (filename, mxc_uri));
+    }
+
+    fn files(files: &HashMap<String, (String, MxcUri)>) -> Vec<(String, MxcUri)> {
+        let mut images = Vec::new();
+        for (name, uri) in files.values() {
+            let path = std::path::Path::new(name);
+            let suffix = path
+                .extension()
+                .map(|osstr| osstr.to_str().unwrap())
+                .unwrap_or("".into());
+            let filename = format!("{}.{}", uri.media_id().unwrap_or("no-media-id"), suffix);
+
+            images.insert(0, (filename, uri.clone()));
+        }
+
+        images
+    }
+
     pub fn remove_reaction_id(&self, event_id: &str) -> ReactionType {
         if self.approvals.borrow_mut().remove(event_id) {
             ReactionType::Approval
@@ -82,6 +132,10 @@ impl News {
             ReactionType::Section(None)
         } else if self.project_names.borrow_mut().remove(event_id).is_some() {
             ReactionType::Project(None)
+        } else if self.images.borrow_mut().remove(event_id).is_some() {
+            ReactionType::Image
+        } else if self.videos.borrow_mut().remove(event_id).is_some() {
+            ReactionType::Video
         } else {
             ReactionType::None
         }
@@ -103,7 +157,29 @@ impl News {
                 return true;
             }
         }
+        for i in self.images.borrow().keys() {
+            if i == reaction_id {
+                return true;
+            }
+        }
+        for i in self.videos.borrow().keys() {
+            if i == reaction_id {
+                return true;
+            }
+        }
 
         false
+    }
+}
+
+impl PartialOrd for News {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.timestamp.cmp(&other.timestamp))
+    }
+}
+
+impl Ord for News {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.timestamp.cmp(&other.timestamp)
     }
 }

@@ -1,6 +1,7 @@
 use chrono::Datelike;
 use matrix_sdk::RoomMember;
 use rand::Rng;
+use ruma::MxcUri;
 
 use std::collections::BTreeMap;
 use std::collections::HashSet;
@@ -33,14 +34,21 @@ pub struct RenderResult {
     pub rendered: String,
     pub warnings: Vec<String>,
     pub notes: Vec<String>,
+    pub images: Vec<(String, MxcUri)>,
+    pub videos: Vec<(String, MxcUri)>,
 }
 
 pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> RenderResult {
     let mut render_projects: BTreeMap<String, RenderProject> = BTreeMap::new();
     let mut render_sections: BTreeMap<String, RenderSection> = BTreeMap::new();
 
+    let news_count = news_list.len();
+    let mut not_approved = 0;
     let mut report_text = String::new();
     let mut project_names: HashSet<String> = HashSet::new();
+
+    let mut images: Vec<(String, MxcUri)> = Vec::new();
+    let mut videos: Vec<(String, MxcUri)> = Vec::new();
 
     let mut warnings: Vec<String> = Vec::new();
     let mut notes: Vec<String> = Vec::new();
@@ -51,43 +59,44 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
         // Skip news entries which are not approved
         if !news.is_approved() {
+            not_approved += 1;
             continue;
         }
 
         // Check if the news entry has multiple project/information set
-        if news.project_names().len() > 1 {
-            warnings.insert(0, format!("[{}] News entry by {} has multiple project information set, it'll appear multiple times. This is probably not wanted!", message_link, news.reporter_display_name));
-        }
-        if news.section_names().len() > 1 {
-            warnings.insert(0, format!("[{}] News entry by {} has multiple section information set, it'll appear multiple times. This is probably not wanted!", message_link, news.reporter_display_name));
+        if news.project_names().len() > 1 || news.section_names().len() > 1 {
+            warnings.insert(0, format!("[{}] News entry by {} has multiple project or section information set, it'll appear multiple times. This is probably not wanted!", message_link, news.reporter_display_name));
         }
 
-        // News entry doesn't have project information...
+        // Check if the news entry has at one project or section information added
+        if news.project_names().is_empty() && news.section_names().is_empty() {
+            warnings.insert(0, format!("[{}] News entry by {} doesn't have project/section information, it'll not appear in the rendered markdown!", message_link, news.reporter_display_name));
+            continue;
+        }
+
+        // Get news images / videos
+        images.append(&mut news.images().clone());
+        videos.append(&mut news.videos().clone());
+
+        // Add news entries without any project information (but with section information) directly to the specified `RenderSection`
         if news.project_names().is_empty() {
-            // ... and not section information either?
-            if news.section_names().is_empty() {
-                warnings.insert(0, format!("[{}] News entry by {} doesn't have project/section information, it'll not appear in the rendered markdown!", message_link, news.reporter_display_name));
+            notes.insert(0, format!("[{}] News entry by {} doesn't have project information, it'll appear directly in the section without any project description.", message_link, news.reporter_display_name));
 
-            // ... add news without project information (but with section information) directly to the specified `RenderSection`
-            } else {
-                notes.insert(0, format!("[{}] News entry by {} doesn't have project information, it'll appear directly in the section without any project description.", message_link, news.reporter_display_name));
-
-                for section_name in news.section_names() {
-                    match render_sections.get_mut(&section_name) {
-                        // RenderSection already exists -> Add news entry to it
-                        Some(render_section) => {
-                            render_section.news.insert(0, news.clone());
-                        }
-                        // RenderSection doesn't exist yet -> Create it, and add news entry to it
-                        None => {
-                            let section = config.section_by_name(&section_name).unwrap();
-                            let render_section = RenderSection {
-                                section,
-                                projects: Vec::new(),
-                                news: vec![news.clone()],
-                            };
-                            render_sections.insert(section_name, render_section);
-                        }
+            for section_name in news.section_names() {
+                match render_sections.get_mut(&section_name) {
+                    // RenderSection already exists -> Add news entry to it
+                    Some(render_section) => {
+                        render_section.news.insert(0, news.clone());
+                    }
+                    // RenderSection doesn't exist yet -> Create it, and add news entry to it
+                    None => {
+                        let section = config.section_by_name(&section_name).unwrap();
+                        let render_section = RenderSection {
+                            section,
+                            projects: Vec::new(),
+                            news: vec![news.clone()],
+                        };
+                        render_sections.insert(section_name, render_section);
                     }
                 }
             }
@@ -201,6 +210,23 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
         }
     }
 
+    // Create summary notes
+    if not_approved != 0 {
+        let note = format!(
+            "{} news are not included because of missing approval. Use !status command to list them.",
+            not_approved
+        );
+        notes.insert(0, note);
+    }
+
+    let summary = format!(
+        "Rendered markdown is including {} news, {} image(s) and {} video(s)!",
+        news_count,
+        images.len(),
+        videos.len(),
+    );
+    notes.insert(0, summary);
+
     // Load template file
     let path = match env::var("TEMPLATE_PATH") {
         Ok(val) => val,
@@ -238,10 +264,16 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     template = template.replace("{{author}}", &display_name);
     template = template.replace("{{report}}", &report_text.trim());
 
+    // Rerverse order to make it more easy to read
+    warnings.reverse();
+    notes.reverse();
+
     RenderResult {
         rendered: template,
         warnings,
         notes,
+        images,
+        videos,
     }
 }
 
@@ -254,12 +286,23 @@ fn news_md(news: &News) -> String {
     let verb = random_verb();
     let message = prepare_message(news.message());
 
-    let news_md = format!(
+    let mut news_md = format!(
         "{} {}\n\n\
-        {}\n\n",
+        {}\n",
         user, verb, message
     );
 
+    // Insert images/videos into markdown > quote
+    for (filename, _) in news.images() {
+        let image = format!(">\n> ![]({})\n", filename);
+        news_md += &image;
+    }
+    for (filename, _) in news.videos() {
+        let video = format!(">\n> {{< video src=\"{}\" >}}\n", filename);
+        news_md += &video;
+    }
+
+    news_md += "\n";
     news_md
 }
 

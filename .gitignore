@@ -6,3 +6,6 @@ store.json
 backup.json
 template.md
 *.json~
+start-ra.sh
+.flatpak
+.vscode

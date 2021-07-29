@@ -14,6 +14,8 @@ pub struct Config {
     pub reporting_room_id: String,
     pub admin_room_id: String,
     pub approval_emoji: String,
+    pub image_emoji: String,
+    pub video_emoji: String,
     pub editors: Vec<String>,
     pub sections: Vec<Section>,
     pub projects: Vec<Project>,
@@ -55,7 +57,11 @@ impl Config {
     pub fn reaction_type_by_emoji(&self, emoji: &str) -> ReactionType {
         if utils::emoji_cmp(&self.approval_emoji, emoji) {
             return ReactionType::Approval;
-        } else {
+        } else if utils::emoji_cmp(&self.image_emoji, emoji){
+            return ReactionType::Image;
+        } else if utils::emoji_cmp(&self.video_emoji, emoji){
+            return ReactionType::Video;
+        }else {
             // section
             for section in &self.sections {
                 if utils::emoji_cmp(&section.emoji, emoji) {

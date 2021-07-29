@@ -1,13 +1,40 @@
+use matrix_sdk::room::Room;
 use matrix_sdk::BaseRoomMember;
 use regex::Regex;
+use ruma::api::client::r0::room::get_room_event::Request;
 use ruma::events::room::message::MessageEventContent;
 use ruma::events::room::message::MessageType;
 use ruma::events::room::message::Relation;
 use ruma::events::room::message::Replacement;
 use ruma::events::room::message::TextMessageEventContent;
+use ruma::events::AnyMessageEvent;
+use ruma::events::AnyRoomEvent;
+use ruma::events::MessageEvent;
 use ruma::events::SyncMessageEvent;
 use ruma::EventId;
 use ruma::UserId;
+
+/// Get room message by event id
+pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyRoomEvent> {
+    let request = Request::new(room.room_id(), &event_id);
+    let event = room.event(request).await.ok()?.event.deserialize().ok()?;
+
+    Some(event)
+}
+
+pub async fn message_type(room_event: &AnyRoomEvent) -> Option<MessageType> {
+    if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(MessageEvent {
+        content: MessageEventContent {
+            msgtype: msg_type, ..
+        },
+        ..
+    })) = room_event
+    {
+        Some(msg_type.clone())
+    } else {
+        None
+    }
+}
 
 /// A simplified way of getting the text from a message event
 pub fn get_message_event_text(event: &SyncMessageEvent<MessageEventContent>) -> Option<String> {
@@ -78,14 +105,6 @@ pub fn msg_starts_with_mention(user_id: UserId, msg: String) -> bool {
     // Catch "@botname ..." messages
     let msg = msg.replace(&format!("@{}", localpart), &localpart);
     msg.as_str().to_lowercase().starts_with(&localpart)
-}
-
-pub fn summary(message: &str) -> String {
-    if message.len() > 60 {
-        format!("{} ...", message.split_at(50).0)
-    } else {
-        message.to_string()
-    }
 }
 
 /// Returns `true` if the emojis are matching

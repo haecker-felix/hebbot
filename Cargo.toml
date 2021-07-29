@@ -5,8 +5,8 @@ authors = ["Felix Häcker <haeckerfelix@gnome.org>"]
 edition = "2018"
 
 [dependencies]
-ruma = { git = "https://github.com/haecker-felix/ruma/", branch = "patch-1", features = ["events"] }
-matrix-sdk = "0.3"
+ruma = "0.2.0"
+matrix-sdk = { git="https://github.com/haecker-felix/matrix-rust-sdk", branch="wip/haeckerfelix/room-event" }
 serde = "1.0"
 serde_json = "1.0"
 url = "2.2"
@@ -18,7 +18,3 @@ chrono = { version = "0.4", features = ["serde"] }
 regex = "1.5"
 rand = "0.8"
 mime = "0.3"
-
-[patch.crates-io]
-ruma = { git = "https://github.com/haecker-felix/ruma/", branch = "patch-1", features = ["events"] }
-ruma-identifiers = { git ="https://github.com/haecker-felix/ruma/", branch = "patch-1", features = ["events"] }

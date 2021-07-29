@@ -180,22 +180,35 @@ impl EventHandler for EventCallback {
     async fn on_room_reaction(&self, room: Room, event: &SyncMessageEvent<ReactionEventContent>) {
         if let Room::Joined(ref _joined) = room {
             let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
-            let relation = &event.content.relates_to;
             let reaction_event_id = event.event_id.clone();
-            let message_event_id = relation.event_id.clone();
-
-            // Remove emoji variant form
+            let relation = &event.content.relates_to;
+            let related_event_id = relation.event_id.clone();
             let emoji = &relation.emoji.replace("\u{fe0f}", "");
 
-            // Reporting room
-            if room.room_id() == self.0.reporting_room.room_id() {
-                self.on_reporting_room_reaction(
-                    &reaction_sender,
-                    &emoji,
-                    &message_event_id,
-                    &reaction_event_id,
-                )
-                .await;
+            if let Some(related_event) = utils::room_event_by_id(&room, &related_event_id).await {
+                if let Some(related_msg_type) = utils::message_type(&related_event).await {
+                    // Reporting room
+                    if room.room_id() == self.0.reporting_room.room_id() {
+                        self.on_reporting_room_reaction(
+                            &reaction_sender,
+                            &emoji,
+                            &reaction_event_id,
+                            &related_event_id,
+                            &related_msg_type,
+                        )
+                        .await;
+                    }
+                } else {
+                    debug!(
+                        "Reaction related message isn't a room message (id {})",
+                        related_event_id.to_string()
+                    );
+                }
+            } else {
+                warn!(
+                    "Couldn't get reaction related event (id {})",
+                    related_event_id.to_string()
+                );
             }
         }
     }
@@ -312,92 +325,165 @@ impl EventCallback {
         &self,
         reaction_sender: &RoomMember,
         reaction_emoji: &str,
-        message_event_id: &EventId,
         reaction_event_id: &EventId,
+        related_event_id: &EventId,
+        related_message_type: &MessageType,
     ) {
         // Check if the sender is a editor (= has the permission to use emoji "commands")
         if !self.is_editor(&reaction_sender).await {
             return;
         }
 
-        let message_event_id = message_event_id.to_string();
-        let reaction_event_id = reaction_event_id.to_string();
-
-        let reaction_type = self.0.config.reaction_type_by_emoji(&reaction_emoji);
-        let link = self.message_link(message_event_id.clone());
-
-        let message = {
+        let message: Option<String> = {
             let news_store = self.0.news_store.lock().unwrap();
-            let msg = if let Some(news) = news_store.news_by_message_id(&message_event_id) {
-                match reaction_type {
-                    ReactionType::Approval => {
-                        news.add_approval(reaction_event_id);
+
+            let reaction_event_id = reaction_event_id.to_string();
+            let reaction_type = self.0.config.reaction_type_by_emoji(&reaction_emoji);
+            let related_event_id = related_event_id.to_string();
+            let link = self.message_link(related_event_id.clone());
+
+            if reaction_type == ReactionType::None {
+                debug!(
+                    "Ignore emoji reaction, doesn't match any known emoji ({:?})",
+                    reaction_emoji
+                );
+                return;
+            }
+
+            let msg = match related_message_type {
+                MessageType::Text(_) => {
+                    let msg = if let Some(news) = news_store.news_by_message_id(&related_event_id) {
+                        match reaction_type {
+                            ReactionType::Approval => {
+                                news.add_approval(reaction_event_id);
+                                Some(format!(
+                                    "✅ Editor {} approved {}'s news entry. [{}]",
+                                    reaction_sender.user_id().to_string(),
+                                    news.reporter_id,
+                                    link
+                                ))
+                            }
+                            ReactionType::Section(section) => {
+                                let section = section.unwrap();
+                                news.add_section_name(reaction_event_id, section.name);
+                                Some(format!(
+                                    "✅ Editor {} added {}'s news entry [{}] to the \"{}\" section.",
+                                    reaction_sender.user_id().to_string(),
+                                    news.reporter_id,
+                                    link,
+                                    section.title
+                                ))
+                            }
+                            ReactionType::Project(project) => {
+                                let project = project.unwrap();
+                                news.add_project_name(reaction_event_id, project.name);
+                                Some(format!(
+                                    "✅ Editor {} added the project description \"{}\" to {}'s news entry [{}].",
+                                    reaction_sender.user_id().to_string(),
+                                    project.title,
+                                    news.reporter_id,
+                                    link
+                                ))
+                            }
+                            ReactionType::Image => {
+                                Some(format!(
+                                    "❌ It's not possible to save {}'s news entry as image (only image messages are supported) [{}].",
+                                    news.reporter_id,
+                                    link
+                                ))
+                            }
+                            ReactionType::Video => {
+                                Some(format!(
+                                    "❌ It's not possible to save {}'s news entry as video (only video messages are supported) [{}].",
+                                    news.reporter_id,
+                                    link
+                                ))
+                            }
+                            _ => None,
+                        }
+                    } else {
                         Some(format!(
-                            "✅ Editor {} approved {}'s news entry. ({})",
+                            "❌ Unable to process {}'s {} reaction, message doesn't exist or isn't a news submission [{}]\n(ID {})",
                             reaction_sender.user_id().to_string(),
-                            news.reporter_id,
-                            link
-                        ))
-                    }
-                    ReactionType::Section(section) => {
-                        let section = section.unwrap();
-                        news.add_section_name(reaction_event_id, section.name);
-                        Some(format!(
-                            "✅ Editor {} added {}'s news entry ({}) to the \"{}\" section.",
-                            reaction_sender.user_id().to_string(),
-                            news.reporter_id,
+                            reaction_type,
                             link,
-                            section.title
+                            related_event_id
                         ))
-                    }
-                    ReactionType::Project(project) => {
-                        let project = project.unwrap();
-                        news.add_project_name(reaction_event_id, project.name);
-                        Some(format!(
-                            "✅ Editor {} added the project description \"{}\" to {}'s news entry ({}).",
-                            reaction_sender.user_id().to_string(),
-                            project.title,
-                            news.reporter_id,
-                            link
-                        ))
-                    }
-                    ReactionType::None => {
-                        debug!(
-                            "Ignore emoji reaction, doesn't match any known emoji ({:?})",
-                            reaction_emoji
-                        );
-                        None
-                    }
+                    };
+                    msg
                 }
-            } else {
-                match reaction_type{
-                    ReactionType::Approval => Some(format!(
-                        "❌ Unable to add {}'s news approval ({}), message doesn't exists or isn't a news submission\n(ID {})",
-                        reaction_sender.user_id().to_string(),
-                        link,
-                        message_event_id
-                    )),
-                    ReactionType::Section(section) => Some(format!(
-                        "❌ Unable to add {}'s news entry ({}) to the {} section, message doesn't exists or isn't a news submission\n(ID {})",
-                        reaction_sender.user_id().to_string(),
-                        link,
-                        section.unwrap().title,
-                        message_event_id
-                    )),
-                    ReactionType::Project(project) => Some(format!(
-                        "❌ Unable to add project description \"{}\" to {}'s news entry ({}), message doesn't exists or isn't a news submission\n(ID {})",
-                        project.unwrap().title,
-                        reaction_sender.user_id().to_string(),
-                        link,
-                        message_event_id
-                    )),
-                    ReactionType::None => {
-                        debug!(
-                            "Ignore emoji reaction, doesn't match any known emoji and unable to find message ({:?})",
-                            reaction_emoji
-                        );
-                        None
+                MessageType::Image(image) => match reaction_type {
+                    ReactionType::Image => {
+                        let reporter_id = reaction_sender.user_id().to_string();
+                        if let Some(news) = news_store.latest_news_by_reporter(&reporter_id) {
+                            if let Some(mxc_uri) = &image.url {
+                                news.add_image(
+                                    reaction_event_id,
+                                    image.body.clone(),
+                                    mxc_uri.clone(),
+                                );
+                                Some(format!(
+                                    "✅ Added image to {}'s news entry (\"{}\") [{}].",
+                                    news.reporter_id,
+                                    news.message_summary(),
+                                    link
+                                ))
+                            } else {
+                                None
+                            }
+                        } else {
+                            Some(format!(
+                                "❌ Unable to save {}'s image, no matching news entry found ({}).",
+                                reporter_id, link
+                            ))
+                        }
                     }
+                    _ => Some(format!(
+                        "❌ Invalid reaction emoji {} by {} for message type image [{}].",
+                        reaction_emoji,
+                        reaction_sender.user_id().to_string(),
+                        link
+                    )),
+                },
+                MessageType::Video(video) => match reaction_type {
+                    ReactionType::Video => {
+                        let reporter_id = reaction_sender.user_id().to_string();
+                        if let Some(news) = news_store.latest_news_by_reporter(&reporter_id) {
+                            if let Some(mxc_uri) = &video.url {
+                                news.add_video(
+                                    reaction_event_id,
+                                    video.body.clone(),
+                                    mxc_uri.clone(),
+                                );
+                                Some(format!(
+                                    "✅ Added video to {}'s news entry (\"{}\") [{}].",
+                                    news.reporter_id,
+                                    news.message_summary(),
+                                    link
+                                ))
+                            } else {
+                                None
+                            }
+                        } else {
+                            Some(format!(
+                                "❌ Unable to save {}'s video, no matching news entry found ({}).",
+                                reporter_id, link
+                            ))
+                        }
+                    }
+                    _ => Some(format!(
+                        "❌ Invalid reaction emoji by {} for message type video [{}].",
+                        reaction_sender.user_id().to_string(),
+                        link
+                    )),
+                },
+                _ => {
+                    debug!(
+                        "Unsupported message type {:?} (id {}",
+                        related_message_type,
+                        related_event_id.to_string()
+                    );
+                    None
                 }
             };
             news_store.write_data();
@@ -613,6 +699,32 @@ impl EventCallback {
         if !result.notes.is_empty() {
             self.0.send_message(&notes, true, true).await;
         }
+
+        // Generate a curl command which can get used to download all files (images/videos).
+        let mut files = result.images.clone();
+        files.append(&mut result.videos.clone());
+        if !files.is_empty() {
+            self.0
+                .send_message("Use this command to download all files:", true, true)
+                .await;
+
+            let mut curl_command = "curl".to_string();
+            for (filename, uri) in &files {
+                if uri.is_valid() {
+                    let url = format!(
+                        "{}_matrix/media/r0/download/{}/{}",
+                        self.0.client.homeserver().await.to_string(),
+                        uri.server_name().unwrap(),
+                        uri.media_id().unwrap()
+                    );
+
+                    curl_command += &format!(" {} -o {}", url, filename);
+                }
+            }
+
+            let msg = format!("<pre><code>{}</code></pre>\n", curl_command);
+            self.0.send_message(&msg, true, true).await;
+        }
     }
 
     async fn restart_command(&self) {
@@ -639,7 +751,7 @@ impl EventCallback {
 
             for n in &news {
                 let link = self.message_link(n.event_id.clone());
-                let summary = utils::summary(&n.message());
+                let summary = n.message_summary();
 
                 if n.is_approved() {
                     approved_count += 1;

@@ -48,7 +48,7 @@ impl NewsStore {
         self.news_map.values().cloned().collect()
     }
 
-    pub fn news_by_message_id<'a>(&'a self, message_event_id: &str) -> Option<&'a News> {
+    pub fn news_by_message_id(&self, message_event_id: &str) -> Option<&News> {
         self.news_map.get(message_event_id)
     }
 
@@ -60,6 +60,19 @@ impl NewsStore {
         }
 
         None
+    }
+
+    // TODO: Respect timestamp of original video / image, so it's possible to tag stuff afterwards
+    pub fn latest_news_by_reporter(&self, reporter_id: &str) -> Option<&News>{
+        let mut results: Vec<&News> = Vec::new();
+        for news in self.news_map.values(){
+            if &news.reporter_id == reporter_id{
+                results.insert(0, news);
+            }
+        }
+
+        results.sort();
+        results.pop()
     }
 
     /// Wipes all news entries
