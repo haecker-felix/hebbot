@@ -83,20 +83,22 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
             notes.insert(0, format!("[{}] News entry by {} doesn't have project information, it'll appear directly in the section without any project description.", message_link, news.reporter_display_name));
 
             for section_name in news.section_names() {
-                match render_sections.get_mut(&section_name) {
+                let section = config.section_by_name(&section_name).unwrap();
+                let map_section_name = format!("{}-{}", section.order, section_name);
+
+                match render_sections.get_mut(&map_section_name) {
                     // RenderSection already exists -> Add news entry to it
                     Some(render_section) => {
                         render_section.news.insert(0, news.clone());
                     }
                     // RenderSection doesn't exist yet -> Create it, and add news entry to it
                     None => {
-                        let section = config.section_by_name(&section_name).unwrap();
                         let render_section = RenderSection {
                             section,
                             projects: Vec::new(),
                             news: vec![news.clone()],
                         };
-                        render_sections.insert(section_name, render_section);
+                        render_sections.insert(map_section_name, render_section);
                     }
                 }
             }
@@ -163,20 +165,22 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
             render_project.project.default_section.clone()
         };
 
-        match render_sections.get_mut(&section_name) {
-            // RenderSection already exists -> Add render_project entry to it
+        let section = config.section_by_name(&section_name).unwrap();
+        let map_section_name = format!("{}-{}", section.order, section_name);
+
+        match render_sections.get_mut(&map_section_name) {
+            // RenderSection already exists -> default_sectionAdd render_project entry to it
             Some(render_section) => {
                 render_section.projects.insert(0, render_project);
             }
             // RenderSection doesn't exist yet -> Create it, and add render_project entry to it
             None => {
-                let section = config.section_by_name(&section_name).unwrap();
                 let render_section = RenderSection {
                     section,
                     projects: vec![render_project],
                     news: Vec::new(),
                 };
-                render_sections.insert(section_name, render_section);
+                render_sections.insert(map_section_name, render_section);
             }
         }
     }
