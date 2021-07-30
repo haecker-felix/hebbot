@@ -1,3 +1,6 @@
+use chrono::DateTime;
+use chrono::Utc;
+
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -62,17 +65,32 @@ impl NewsStore {
         None
     }
 
-    // TODO: Respect timestamp of original video / image, so it's possible to tag stuff afterwards
-    pub fn latest_news_by_reporter(&self, reporter_id: &str) -> Option<&News>{
-        let mut results: Vec<&News> = Vec::new();
-        for news in self.news_map.values(){
-            if &news.reporter_id == reporter_id{
-                results.insert(0, news);
+    pub fn find_related_news(&self, reporter_id: &str, timestamp: &DateTime<Utc>) -> Option<&News> {
+        let mut shortest_time_diff = None;
+        let mut related_news = None;
+
+        for news in self.news_map.values() {
+            if &news.reporter_id != reporter_id {
+                continue;
+            }
+
+            let time_diff = (news.timestamp.time() - timestamp.time())
+                .num_seconds()
+                .abs();
+
+            if shortest_time_diff.is_none() {
+                related_news = Some(news);
+                shortest_time_diff = Some(time_diff);
+                continue;
+            }
+
+            if time_diff < shortest_time_diff.unwrap() {
+                related_news = Some(news);
+                shortest_time_diff = Some(time_diff);
             }
         }
 
-        results.sort();
-        results.pop()
+        related_news
     }
 
     /// Wipes all news entries

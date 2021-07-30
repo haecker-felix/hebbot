@@ -1,3 +1,5 @@
+use chrono::DateTime;
+use chrono::Utc;
 use matrix_sdk::room::Joined;
 use matrix_sdk::room::Room;
 use matrix_sdk::uuid::Uuid;
@@ -9,6 +11,7 @@ use ruma::events::reaction::ReactionEventContent;
 use ruma::events::room::message::FileMessageEventContent;
 use ruma::events::room::message::MessageType;
 use ruma::events::room::redaction::SyncRedactionEvent;
+use ruma::events::AnyRoomEvent;
 use ruma::events::SyncMessageEvent;
 use ruma::events::{room::message::MessageEventContent, AnyMessageEventContent};
 use ruma::EventId;
@@ -193,7 +196,7 @@ impl EventHandler for EventCallback {
                             &reaction_sender,
                             &emoji,
                             &reaction_event_id,
-                            &related_event_id,
+                            &related_event,
                             &related_msg_type,
                         )
                         .await;
@@ -326,7 +329,7 @@ impl EventCallback {
         reaction_sender: &RoomMember,
         reaction_emoji: &str,
         reaction_event_id: &EventId,
-        related_event_id: &EventId,
+        related_event: &AnyRoomEvent,
         related_message_type: &MessageType,
     ) {
         // Check if the sender is a editor (= has the permission to use emoji "commands")
@@ -339,7 +342,12 @@ impl EventCallback {
 
             let reaction_event_id = reaction_event_id.to_string();
             let reaction_type = self.0.config.reaction_type_by_emoji(&reaction_emoji);
-            let related_event_id = related_event_id.to_string();
+            let related_event_id = related_event.event_id().to_string();
+            let related_event_timestamp: DateTime<Utc> = related_event
+                .origin_server_ts()
+                .to_system_time()
+                .unwrap()
+                .into();
             let link = self.message_link(related_event_id.clone());
 
             if reaction_type == ReactionType::None {
@@ -415,7 +423,9 @@ impl EventCallback {
                 MessageType::Image(image) => match reaction_type {
                     ReactionType::Image => {
                         let reporter_id = reaction_sender.user_id().to_string();
-                        if let Some(news) = news_store.latest_news_by_reporter(&reporter_id) {
+                        if let Some(news) =
+                            news_store.find_related_news(&reporter_id, &related_event_timestamp)
+                        {
                             if let Some(mxc_uri) = &image.url {
                                 news.add_image(
                                     reaction_event_id,
@@ -448,7 +458,9 @@ impl EventCallback {
                 MessageType::Video(video) => match reaction_type {
                     ReactionType::Video => {
                         let reporter_id = reaction_sender.user_id().to_string();
-                        if let Some(news) = news_store.latest_news_by_reporter(&reporter_id) {
+                        if let Some(news) =
+                            news_store.find_related_news(&reporter_id, &related_event_timestamp)
+                        {
                             if let Some(mxc_uri) = &video.url {
                                 news.add_video(
                                     reaction_event_id,
