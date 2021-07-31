@@ -423,9 +423,10 @@ impl EventCallback {
                 MessageType::Image(image) => match reaction_type {
                     ReactionType::Image => {
                         let reporter_id = reaction_sender.user_id().to_string();
-                        if let Some(news) =
-                            news_store.find_related_news(&reporter_id, &related_event_timestamp)
-                        {
+                        if let Some(news) = news_store.find_related_news(
+                            &related_event.sender().to_string(),
+                            &related_event_timestamp,
+                        ) {
                             if let Some(mxc_uri) = &image.url {
                                 news.add_image(
                                     reaction_event_id,
@@ -458,9 +459,10 @@ impl EventCallback {
                 MessageType::Video(video) => match reaction_type {
                     ReactionType::Video => {
                         let reporter_id = reaction_sender.user_id().to_string();
-                        if let Some(news) =
-                            news_store.find_related_news(&reporter_id, &related_event_timestamp)
-                        {
+                        if let Some(news) = news_store.find_related_news(
+                            &related_event.sender().to_string(),
+                            &related_event_timestamp,
+                        ) {
                             if let Some(mxc_uri) = &video.url {
                                 news.add_video(
                                     reaction_event_id,
