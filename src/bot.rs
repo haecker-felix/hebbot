@@ -494,8 +494,7 @@ impl EventCallback {
                 _ => {
                     debug!(
                         "Unsupported message type {:?} (id {}",
-                        related_message_type,
-                        related_event_id.to_string()
+                        related_message_type, related_event_id
                     );
                     None
                 }

@@ -116,7 +116,7 @@ impl News {
             let suffix = path
                 .extension()
                 .map(|osstr| osstr.to_str().unwrap())
-                .unwrap_or("".into());
+                .unwrap_or_else(|| "");
             let filename = format!("{}.{}", uri.media_id().unwrap_or("no-media-id"), suffix);
 
             images.insert(0, (filename, uri.clone()));

@@ -70,7 +70,7 @@ impl NewsStore {
         let mut related_news = None;
 
         for news in self.news_map.values() {
-            if &news.reporter_id != reporter_id {
+            if news.reporter_id != reporter_id {
                 continue;
             }
 

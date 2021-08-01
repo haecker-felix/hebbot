@@ -75,15 +75,13 @@ pub fn get_edited_message_event_text(
         ..
     } = event
     {
-        if let content = new_content {
-            if let MessageEventContent {
-                msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
-                relates_to: None,
-                ..
-            } = &**content
-            {
-                return Some((event_id.clone(), msg_body.to_string()));
-            }
+        if let MessageEventContent {
+            msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
+            relates_to: None,
+            ..
+        } = &**new_content
+        {
+            return Some((event_id.clone(), msg_body.to_string()));
         }
     }
     None
