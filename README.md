@@ -2,22 +2,46 @@
 
 A [Matrix](matrix.org) bot which can help to generate periodic / recurrent summary blog posts (also known as "This Week in X"). 
 
-The bot was inspired by [twim-o-matic](https://github.com/matrix-org/twim-o-matic/tree/master/data), and is developed in Rust using the [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk). The focus is to make it as generic as possible so that as many projects / communities can use this bot. 
+The bot was inspired by [twim-o-matic](https://github.com/matrix-org/twim-o-matic/tree/master/data), and is developed in Rust using the [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk). 
 
-Two Matrix rooms are required to use this bot:
+### Features
+- Automatic recognition of news when the bot username is mentioned at the beginning of the message
+- Approval of messages by a defined group of editors
+- Messages can be sorted into projects / sections by using emoji reactions
+- Support for images / videos
+- Markdown generation (can be used for blogs, e.g. Hugo) 
 
-##### "Reporting" room
+### Screenshots
+![](images/render_command.png)
+![](images/message_recognition.png)
 
-This room is open to everyone. Here people can share news at any time, which will be in the next summary. 
+### Usage
+Two Matrix rooms are required to use this bot.
 
-##### "Admin" room
+#### "Reporting" room
+This room is open to everyone. Here people can share news any time. Editors can mark messages, but also images and videos with emoji reactions here. For example...
+- ⭕: Approve a message (to include it in the rendered markdown)
+- 📷️: Add image. The image will then be automatically added to the corresponding news message, and inserted in the rendered markdown. 
+- 🛰️: Add message to the third-party section
 
-In this closed room administrative commands can be executed (e.g. `!clean` to remove all saved messages, or `!render-file` to create a summary as a markdown file). A complete listing of all commands can be displayed with the `!help` command.
+Those emojis are just an example, you can configure them as you want in the `config.json` file. 
 
-Contextual commands are executed in the form of emoji reactions.  For example, a particular news item can be approved by adding the "⭕" emoji as a reaction to the corresponding message in the reporting room. In the same way, news can be sorted into sections, or automatically tagged with specific project information.
+#### "Admin" room
+In this closed room administrative commands can be executed.
+
+| Command         | Description                                                |
+| --------------- | ---------------------------------------------------------- |
+| !clear          | Clears all stored news                                     |
+| !list-config    | Lists current bot configuration                            |
+| !list-projects  | Lists configured projects                                  |
+| !list-sections  | Lists configured sections                                  |
+| !render         | Creates a markdown file with the stored news               |
+| !restart        | Restarts the bot, useful when you edited the configuration |
+| !say  "message" | Sends a message in reporting room                          |
+| !status         | Shows saved messages                                       |
 
 ### Configuration
-In order to use the bot, two configuration files are required. The `config.json` configuration file contains the basic bot settings (e.g. username/password, room ids, ...) and the definitions for the sections and projects. The second configuration file `template.md` serves as a template for the actual summary, which can be generated later. 
+In order to use the bot, two configuration files are required. The `config.json` configuration file contains the bot settings (e.g. username/password, room ids, ...) and the definitions for the sections and projects. The second configuration file `template.md` serves as a template for the actual summary.
 
 For both configuration files, examples are available that can be used as templates (`configuration/*.example` files). 
 
