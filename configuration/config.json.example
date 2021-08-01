@@ -1,46 +1,47 @@
 {
-	"bot_user_id": "@botname:domain.org",
-	"bot_password": "supersecurepassword",
-	"reporting_room_id": "!roomid:domain.org",
-	"admin_room_id": "!adminroomid:domain.org",
-	"approval_emoji": "⭕",
-	"editors": [
-		"@user1:domain.io",
-		"@user1:domain.org"
-	],
-	"sections": [
-                {
-                        "title": "New projects",
-                        "emoji": "⚙",
-                        "order": 100
-                },
-                {
-                        "title": "Updated Apps",
-                        "emoji": "🔵",
-                        "order": 200
-                },
-                {
-                        "title": "Interesting Projects",
-                        "emoji": "🛰",
-                        "order": 300
-                }
-
-	],
-	"projects": [
-                {
-                	"name": "shortwave",
-                	"display_name": "Shortwave",
-			"description": "{{project}} is an internet radio player that provides access to a database with over 25000 stations.",
-                        "repository": "https://gitlab.gnome.org/World/Shortwave",
-			"emoji": "📻"
-                },
-                {
-                	"name": "fragments",
-                	"display_name": "Fragments",
-			"description": "{{project}} is an easy to use BitTorrent client.",
-                        "repository": "https://gitlab.gnome.org/World/Fragments",
-			"emoji": "↙"
-                }
-        ]
-
+  "bot_user_id": "@botname:domain.org",
+  "bot_password": "supersecurepassword",
+  "reporting_room_id": "!roomid:domain.org",
+  "admin_room_id": "!adminroomid:domain.org",
+  "approval_emoji": "⭕",
+  "image_emoji": "📷️",
+  "image_markdown": "\n> ![]({{file}})",
+  "video_emoji": "📹️",
+  "video_markdown": "\n> {{< video src=\"{{file}}\" >}}",
+  "editors": [
+    "@user1:domain.io",
+    "@user1:domain.io"
+  ],
+  "sections": [
+    {
+      "emoji": "🔵",
+      "name": "core",
+      "title": "Core Apps and Libraries",
+      "order": 100
+    },
+    {
+      "emoji": "🛰️",
+      "name": "third-party",
+      "title": "Third Party Projects",
+      "order": 200
+    }
+  ],
+  "projects": [
+    {
+      "emoji": "📻",
+      "name": "shortwave",
+      "title": "Shortwave",
+      "description": "Internet radio player with over 25000 stations.",
+      "website": "https://gitlab.gnome.org/World/Shortwave",
+      "default_section": "third-party"
+    },
+    {
+      "emoji": "⬇️",
+      "name": "fragments",
+      "title": "Fragments",
+      "description": "Easy to use BitTorrent client.",
+      "website": "https://gitlab.gnome.org/World/Fragments",
+      "default_section": "third-party"
+    }
+  ]
 }
