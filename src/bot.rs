@@ -1,33 +1,19 @@
-use chrono::DateTime;
-use chrono::Utc;
-use matrix_sdk::room::Joined;
-use matrix_sdk::room::Room;
+use chrono::{DateTime, Utc};
+use matrix_sdk::room::{Joined, Room};
 use matrix_sdk::uuid::Uuid;
-use matrix_sdk::Client;
-use matrix_sdk::EventHandler;
-use matrix_sdk::RoomMember;
-use matrix_sdk::SyncSettings;
+use matrix_sdk::{Client, EventHandler, RoomMember, SyncSettings};
 use ruma::events::reaction::ReactionEventContent;
-use ruma::events::room::message::FileMessageEventContent;
-use ruma::events::room::message::MessageType;
+use ruma::events::room::message::{FileMessageEventContent, MessageEventContent, MessageType};
 use ruma::events::room::redaction::SyncRedactionEvent;
-use ruma::events::AnyRoomEvent;
-use ruma::events::SyncMessageEvent;
-use ruma::events::{room::message::MessageEventContent, AnyMessageEventContent};
-use ruma::EventId;
-use ruma::MxcUri;
-use ruma::RoomId;
-use ruma::UserId;
+use ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
+use ruma::{EventId, MxcUri, RoomId, UserId};
 
 use std::convert::TryFrom;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-use crate::render;
-use crate::utils;
-use crate::{Config, News, NewsStore, ReactionType};
+use crate::{render, utils, Config, News, NewsStore, ReactionType};
 
 #[derive(Clone)]
 pub struct Bot {

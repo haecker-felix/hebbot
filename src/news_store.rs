@@ -1,11 +1,9 @@
-use chrono::DateTime;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 
 use std::collections::HashMap;
-use std::env;
-use std::fs;
 use std::fs::File;
 use std::io::Read;
+use std::{env, fs};
 
 use crate::{Error, News};
 

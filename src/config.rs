@@ -4,8 +4,7 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 
-use crate::utils;
-use crate::{Project, ReactionType, Section};
+use crate::{utils, Project, ReactionType, Section};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {

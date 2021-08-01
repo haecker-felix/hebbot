@@ -3,14 +3,12 @@ use matrix_sdk::RoomMember;
 use rand::Rng;
 use ruma::MxcUri;
 
-use std::collections::BTreeMap;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::fs::File;
 use std::io::Read;
 
-use crate::utils;
-use crate::{Config, News, Project, Section};
+use crate::{utils, Config, News, Project, Section};
 
 #[derive(Debug, Default)]
 struct RenderProject {

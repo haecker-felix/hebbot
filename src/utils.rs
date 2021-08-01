@@ -2,17 +2,11 @@ use matrix_sdk::room::Room;
 use matrix_sdk::BaseRoomMember;
 use regex::Regex;
 use ruma::api::client::r0::room::get_room_event::Request;
-use ruma::events::room::message::MessageEventContent;
-use ruma::events::room::message::MessageType;
-use ruma::events::room::message::Relation;
-use ruma::events::room::message::Replacement;
-use ruma::events::room::message::TextMessageEventContent;
-use ruma::events::AnyMessageEvent;
-use ruma::events::AnyRoomEvent;
-use ruma::events::MessageEvent;
-use ruma::events::SyncMessageEvent;
-use ruma::EventId;
-use ruma::UserId;
+use ruma::events::room::message::{
+    MessageEventContent, MessageType, Relation, Replacement, TextMessageEventContent,
+};
+use ruma::events::{AnyMessageEvent, AnyRoomEvent, MessageEvent, SyncMessageEvent};
+use ruma::{EventId, UserId};
 
 /// Get room message by event id
 pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyRoomEvent> {
