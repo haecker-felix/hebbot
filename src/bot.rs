@@ -54,7 +54,8 @@ impl Bot {
             admin_room,
         };
 
-        //bot.send_message("Started hebbot service!", true).await;
+        bot.send_message("✅ Successfully started hebbot!", false, true)
+            .await;
 
         // Setup event handler
         let handler = Box::new(EventCallback(bot.clone()));
