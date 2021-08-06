@@ -496,15 +496,11 @@ impl EventCallback {
     }
 
     /// Something got redacted in reporting room
-    /// - Only redaction from editors are processed
     /// - Undo any reaction emoji "command" (eg. unapproving a news entry)
+    /// - Or a message itself got deleted / redacted
     async fn on_reporting_room_redaction(&self, member: &RoomMember, redacted_event_id: &EventId) {
-        // Check if the sender is a editor (= has the permission to use emoji commands)
-        if !self.is_editor(&member).await {
-            return;
-        }
-
         let message = {
+            let is_editor = self.is_editor(&member).await;
             let mut news_store = self.0.news_store.lock().unwrap();
             let redacted_event_id = redacted_event_id.to_string();
             let link = self.message_link(redacted_event_id.clone());
@@ -516,6 +512,9 @@ impl EventCallback {
                     news.reporter_id,
                     member.user_id().to_string()
                 ))
+            // For all other redactions, there is no point in checking them if the member is not an editor.
+            } else if !is_editor {
+                None
             // Redaction of reaction events (approval, project, section)
             } else if let Some(news) = news_store.news_by_reaction_id(&redacted_event_id.clone()) {
                 let reaction_type = news.remove_reaction_id(&redacted_event_id);
