@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 ruma = "0.2.0"
-matrix-sdk = { git="https://github.com/haecker-felix/matrix-rust-sdk", branch="wip/haeckerfelix/room-event" }
+matrix-sdk = { git="https://github.com/matrix-org/matrix-rust-sdk" }
 serde = "1.0"
 serde_json = "1.0"
 url = "2.2"
