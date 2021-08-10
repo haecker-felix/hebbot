@@ -297,11 +297,11 @@ fn news_md(news: &News, config: &Config) -> String {
     // Insert images/videos into markdown > quote
     for (filename, _) in news.images() {
         let image = config.image_markdown.replace("{{file}}", &filename);
-        news_md += &image;
+        news_md += &(image.clone() + "\n");
     }
     for (filename, _) in news.videos() {
         let video = config.video_markdown.replace("{{file}}", &filename);
-        news_md += &video;
+        news_md += &(video.clone() + "\n");
     }
 
     news_md += "\n";
