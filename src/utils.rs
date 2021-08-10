@@ -113,3 +113,13 @@ pub fn remove_bot_name(message: &str, bot: &UserId) -> String {
     let message = re.replace(&message, "");
     message.trim().to_string()
 }
+
+pub fn format_messages(is_warning: bool, list: &Vec<String>) -> String {
+    let emoji = if is_warning { "⚠️" } else { "ℹ️" };
+
+    let mut messages = String::new();
+    for message in list {
+        messages += &format!("- {} {}<br>", emoji, message);
+    }
+    messages
+}

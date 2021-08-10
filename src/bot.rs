@@ -26,7 +26,8 @@ pub struct Bot {
 
 impl Bot {
     pub async fn run() {
-        let config = Config::read();
+        let config_result = Config::read();
+        let config = config_result.config;
         let news_store = Arc::new(Mutex::new(NewsStore::read()));
 
         let username = config.bot_user_id.as_str();
@@ -54,8 +55,19 @@ impl Bot {
             admin_room,
         };
 
-        bot.send_message("✅ Successfully started hebbot!", false, true)
-            .await;
+        bot.send_message("✅ Started hebbot!", false, true).await;
+
+        // Send warnings
+        let warnings = utils::format_messages(true, &config_result.warnings);
+        if !config_result.warnings.is_empty() {
+            bot.send_message(&warnings, true, true).await;
+        }
+
+        // Send notes
+        let notes = utils::format_messages(false, &config_result.notes);
+        if !config_result.notes.is_empty() {
+            bot.send_message(&notes, true, true).await;
+        }
 
         // Setup event handler
         let handler = Box::new(EventCallback(bot.clone()));
@@ -672,29 +684,19 @@ impl EventCallback {
             .await
             .expect("Can't upload rendered file.");
 
-        // Warnings
-        let mut warnings = String::new();
-        for warning in &result.warnings {
-            warnings += &format!("- ⚠️ {}<br>", warning);
-        }
-
-        // Notes
-        let mut notes = String::new();
-        for note in &result.notes {
-            notes += &format!("- ℹ️ {}<br>", note);
-        }
-
         // Send file
         self.0
             .send_file(response.content_uri, "rendered.md".to_string(), true)
             .await;
 
         // Send warnings
+        let warnings = utils::format_messages(true, &result.warnings);
         if !result.warnings.is_empty() {
             self.0.send_message(&warnings, true, true).await;
         }
 
         // Send notes
+        let notes = utils::format_messages(false, &result.notes);
         if !result.notes.is_empty() {
             self.0.send_message(&notes, true, true).await;
         }
