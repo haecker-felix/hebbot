@@ -24,7 +24,7 @@ This room is open to everyone. Here people can share news any time. Editors can 
 - 📷️: Add image. The image will then be automatically added to the corresponding news message, and inserted in the rendered markdown. 
 - 🛰️: Add message to the third-party section
 
-Those emojis are just an example, you can configure them as you want in the `config.json` file. 
+Those emojis are just an example, you can configure them as you want in the `config.toml` file. 
 
 #### "Admin" room
 In this closed room administrative commands can be executed.
@@ -41,7 +41,7 @@ In this closed room administrative commands can be executed.
 | !status         | Shows saved messages                                       |
 
 ### Configuration
-In order to use the bot, two configuration files are required. The `config.json` configuration file contains the bot settings (e.g. username/password, room ids, ...) and the definitions for the sections and projects. The second configuration file `template.md` serves as a template for the actual summary.
+In order to use the bot, two configuration files are required. The `config.toml` configuration file contains the bot settings (e.g. username/password, room ids, ...) and the definitions for the sections and projects. The second configuration file `template.md` serves as a template for the actual summary.
 
 For both configuration files, examples are available that can be used as templates (`configuration/*.example` files). 
 
@@ -58,7 +58,7 @@ services:
     volumes:
       - hebbot_data:/data
     environment:
-      - CONFIG_PATH=/data/config.json
+      - CONFIG_PATH=/data/config.toml
       - TEMPLATE_PATH=/data/template.md
       - STORE_PATH=/data/store.json
 

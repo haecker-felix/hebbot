@@ -33,7 +33,7 @@ impl Config {
     pub fn read() -> ConfigResult {
         let path = match env::var("CONFIG_PATH") {
             Ok(val) => val,
-            Err(_) => "./config.json".to_string(),
+            Err(_) => "./config.toml".to_string(),
         };
 
         let mut file = File::open(path).expect("Unable to open configuration file");
@@ -41,7 +41,7 @@ impl Config {
         file.read_to_string(&mut data)
             .expect("Unable to read configuration file");
 
-        let config: Config = serde_json::from_str(&data).expect("Unable to parse config file");
+        let config: Config = toml::from_str(&data).expect("Unable to parse config file");
         Self::validate_config(config)
     }
 

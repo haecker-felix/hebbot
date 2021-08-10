@@ -636,9 +636,9 @@ impl EventCallback {
         // Don't print bot password
         config.bot_password = "".to_string();
 
-        let json = serde_json::to_string_pretty(&config).unwrap();
+        let toml = toml::to_string_pretty(&config).unwrap();
 
-        let msg = format!("<pre><code>{}</code></pre>\n", json);
+        let msg = format!("<pre><code>{}</code></pre>\n", toml);
         self.0.send_message(&msg, true, true).await;
     }
 

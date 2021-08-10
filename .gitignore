@@ -2,6 +2,7 @@
 /cargo-home
 .buildconfig
 config.json
+config.toml
 store.json
 backup.json
 template.md
