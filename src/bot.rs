@@ -563,6 +563,8 @@ impl EventCallback {
     /// New message in admin room
     /// This is just for administrative stuff (eg. commands)
     async fn on_admin_room_message(&self, msg: String, member: &RoomMember) {
+        let msg = msg.trim().to_string();
+
         // Check if the message is a command
         if !msg.as_str().starts_with('!') {
             return;
@@ -583,6 +585,7 @@ impl EventCallback {
             ""
         };
         let command = split.pop().unwrap_or("");
+        let command = command.trim();
 
         info!("Received command: {} ({})", command, args);
 
