@@ -124,6 +124,29 @@ impl Config {
             );
         }
 
+        let mut section_names = Vec::new();
+        for section in &config.sections {
+            if section.name.is_empty() {
+                warnings.insert(
+                    0,
+                    "Section without name found, this can lead to undefined behavior.".to_string(),
+                );
+                continue;
+            }
+
+            section_names.insert(0, section.name.clone());
+
+            if section.emoji.is_empty() {
+                warnings.insert(
+                    0,
+                    format!(
+                        "Section \"{}\" doesn't have an emoji, this can lead to undefined behavior.",
+                        section.name
+                    ),
+                );
+            }
+        }
+
         for project in &config.projects {
             if project.name.is_empty() {
                 warnings.insert(
@@ -150,24 +173,16 @@ impl Config {
                         project.name
                     ),
                 );
-            }
-        }
-
-        for section in &config.sections {
-            if section.name.is_empty() {
-                warnings.insert(
-                    0,
-                    "Section without name found, this can lead to undefined behavior.".to_string(),
-                );
                 continue;
             }
 
-            if section.emoji.is_empty() {
+            if !section_names.contains(&project.default_section) {
                 warnings.insert(
                     0,
                     format!(
-                        "Section \"{}\" doesn't have an emoji, this can lead to undefined behavior.",
-                        section.name
+                        "Project \"{}\" has an unknown default section \"{}\", this can lead to undefined behavior.",
+                        project.name,
+                        project.default_section
                     ),
                 );
             }
