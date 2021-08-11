@@ -110,7 +110,11 @@ impl News {
     }
 
     fn files(files: &HashMap<String, (String, MxcUri)>) -> Vec<(String, MxcUri)> {
+        let mut images_map = HashMap::new();
         let mut images = Vec::new();
+
+        // First we add everything to a HashMap to filter out duplicates
+        // eg. having two editors who tagged the same image with the camera emoji
         for (name, uri) in files.values() {
             let path = std::path::Path::new(name);
             let suffix = path
@@ -119,7 +123,11 @@ impl News {
                 .unwrap_or_else(|| "");
             let filename = format!("{}.{}", uri.media_id().unwrap_or("no-media-id"), suffix);
 
-            images.insert(0, (filename, uri.clone()));
+            images_map.insert(filename, uri.clone());
+        }
+
+        for (filename, uri) in images_map {
+            images.insert(0, (filename, uri));
         }
 
         images
