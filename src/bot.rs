@@ -73,19 +73,19 @@ impl Bot {
         let handler = Box::new(EventCallback(bot.clone()));
         bot.client.set_event_handler(handler).await;
 
-        info!("Start syncing...");
+        info!("Started syncing…");
         bot.client.sync(SyncSettings::new()).await;
     }
 
     /// Login
     async fn login(client: &Client, user: &str, pwd: &str) {
-        info!("Logging in...");
+        info!("Logging in…");
         let response = client
             .login(user, pwd, Some("hebbot"), Some("hebbot"))
             .await
             .expect("Unable to login");
 
-        info!("Do initial sync...");
+        info!("Doing the initial sync…");
         client
             .sync_once(SyncSettings::new())
             .await
@@ -299,7 +299,7 @@ impl EventCallback {
                 news.set_message(updated_message);
                 if news.is_approved() {
                     Some(format!(
-                        "✅ The news entry by {} got edited ({}). Check the new text, and make sure if you want to keep the approval.",
+                        "✅ The news entry by {} got edited ({}). Check the new text, and make sure you want to keep the approval.",
                         news.reporter_id,
                         link
                     ))
@@ -351,7 +351,7 @@ impl EventCallback {
 
             if reaction_type == ReactionType::None {
                 debug!(
-                    "Ignore emoji reaction, doesn't match any known emoji ({:?})",
+                    "Ignoring emoji reaction, doesn't match any known emoji ({:?})",
                     reaction_emoji
                 );
                 return;
@@ -374,7 +374,7 @@ impl EventCallback {
                                 let section = section.unwrap();
                                 news.add_section_name(reaction_event_id, section.name);
                                 Some(format!(
-                                    "✅ Editor {} added {}'s news entry [{}] to the \"{}\" section.",
+                                    "✅ Editor {} added {}’s news entry [{}] to the “{}” section.",
                                     reaction_sender.user_id().to_string(),
                                     news.reporter_id,
                                     link,
@@ -385,7 +385,7 @@ impl EventCallback {
                                 let project = project.unwrap();
                                 news.add_project_name(reaction_event_id, project.name);
                                 Some(format!(
-                                    "✅ Editor {} added the project description \"{}\" to {}'s news entry [{}].",
+                                    "✅ Editor {} added the project description “{}” to {}’s news entry [{}].",
                                     reaction_sender.user_id().to_string(),
                                     project.title,
                                     news.reporter_id,
@@ -394,14 +394,14 @@ impl EventCallback {
                             }
                             ReactionType::Image => {
                                 Some(format!(
-                                    "❌ It's not possible to save {}'s news entry as image (only image messages are supported) [{}].",
+                                    "❌ It’s not possible to save {}’s news entry as image (only image messages are supported) [{}].",
                                     news.reporter_id,
                                     link
                                 ))
                             }
                             ReactionType::Video => {
                                 Some(format!(
-                                    "❌ It's not possible to save {}'s news entry as video (only video messages are supported) [{}].",
+                                    "❌ It’s not possible to save {}’s news entry as video (only video messages are supported) [{}].",
                                     news.reporter_id,
                                     link
                                 ))
@@ -410,7 +410,7 @@ impl EventCallback {
                         }
                     } else {
                         Some(format!(
-                            "❌ Unable to process {}'s {} reaction, message doesn't exist or isn't a news submission [{}]\n(ID {})",
+                            "❌ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
                             reaction_sender.user_id().to_string(),
                             reaction_type,
                             link,
@@ -433,7 +433,7 @@ impl EventCallback {
                                     mxc_uri.clone(),
                                 );
                                 Some(format!(
-                                    "✅ Added image to {}'s news entry (\"{}\") [{}].",
+                                    "✅ Added image to {}’s news entry (“{}”) [{}].",
                                     news.reporter_id,
                                     news.message_summary(),
                                     link
@@ -443,7 +443,7 @@ impl EventCallback {
                             }
                         } else {
                             Some(format!(
-                                "❌ Unable to save {}'s image, no matching news entry found ({}).",
+                                "❌ Unable to save {}’s image, no matching news entry found ({}).",
                                 reporter_id, link
                             ))
                         }
@@ -469,7 +469,7 @@ impl EventCallback {
                                     mxc_uri.clone(),
                                 );
                                 Some(format!(
-                                    "✅ Added video to {}'s news entry (\"{}\") [{}].",
+                                    "✅ Added video to {}’s news entry (“{}”) [{}].",
                                     news.reporter_id,
                                     news.message_summary(),
                                     link
@@ -479,7 +479,7 @@ impl EventCallback {
                             }
                         } else {
                             Some(format!(
-                                "❌ Unable to save {}'s video, no matching news entry found ({}).",
+                                "❌ Unable to save {}’s video, no matching news entry found ({}).",
                                 reporter_id, link
                             ))
                         }
@@ -521,7 +521,7 @@ impl EventCallback {
             // Redaction / deletion of the news entry itself
             let msg = if let Ok(news) = news_store.remove_news(&redacted_event_id) {
                 Some(format!(
-                    "✅ {}'s news entry got deleted by {}",
+                    "✅ {}’s news entry got deleted by {}",
                     news.reporter_id,
                     member.user_id().to_string()
                 ))
@@ -533,7 +533,7 @@ impl EventCallback {
                 let reaction_type = news.remove_reaction_id(&redacted_event_id);
                 if reaction_type != ReactionType::None {
                     Some(format!(
-                        "✅ Editor {} removed {} from {}'s news entry ({}).",
+                        "✅ Editor {} removed {} from {}’s news entry ({}).",
                         member.user_id().to_string(),
                         reaction_type,
                         news.reporter_id,
@@ -541,7 +541,7 @@ impl EventCallback {
                     ))
                 } else {
                     debug!(
-                        "Ignore redaction, doesn't match any known emoji reaction event id (ID {:?})",
+                        "Ignoring redaction, doesn’t match any known emoji reaction event id (ID {:?})",
                         redacted_event_id
                     );
                     None
@@ -572,7 +572,7 @@ impl EventCallback {
 
         // Check if the sender is a editor (= has the permission to use commands)
         if !self.is_editor(&member).await {
-            let msg = "You don't have the permission to use commands.";
+            let msg = "You don’t have the permission to use commands.";
             self.0.send_message(msg, false, true).await;
             return;
         }
@@ -624,7 +624,7 @@ impl EventCallback {
             let news = news_store.news();
             news_store.clear_news();
 
-            format!("Cleared {} news!", news.len())
+            format!("Cleared {} news entries!", news.len())
         };
 
         self.0.send_message(&msg, false, true).await;
@@ -733,7 +733,7 @@ impl EventCallback {
 
     async fn restart_command(&self) {
         self.0
-            .send_message("Restarting hebbot...", false, true)
+            .send_message("Restarting hebbot…", false, true)
             .await;
         Command::new("/proc/self/exe").exec();
     }
@@ -767,9 +767,9 @@ impl EventCallback {
             }
 
             format!(
-                "{} news in total <br><br>\
-                ✅ Approved news ({}): <br>{} <br>\
-                ❌ Unapproved news ({}): <br>{}",
+                "{} news entries in total <br><br>\
+                ✅ Approved news entries ({}): <br>{} <br>\
+                ❌ Unapproved news entries ({}): <br>{}",
                 sum, approved_count, approved_list, unapproved_count, unapproved_list
             )
         };

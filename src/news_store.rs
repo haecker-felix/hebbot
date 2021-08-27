@@ -99,7 +99,7 @@ impl NewsStore {
 
     /// Writes data as JSON to disk
     pub fn write_data(&self) {
-        debug!("Write data...");
+        debug!("Writing data…");
         let json = serde_json::to_string_pretty(&self.news_map).unwrap();
         let path = Self::get_path();
         fs::write(path, json).expect("Unable to write news store");
