@@ -32,12 +32,13 @@ In this closed room administrative commands can be executed.
 | Command         | Description                                                |
 | --------------- | ---------------------------------------------------------- |
 | !clear          | Clears all stored news                                     |
+| !details "term" | Shows section/project details (term can be emoji or name)  |
 | !list-config    | Lists current bot configuration                            |
 | !list-projects  | Lists configured projects                                  |
 | !list-sections  | Lists configured sections                                  |
 | !render         | Creates a markdown file with the stored news               |
 | !restart        | Restarts the bot, useful when you edited the configuration |
-| !say  "message" | Sends a message in reporting room                          |
+| !say "message"  | Sends a message in reporting room                          |
 | !status         | Shows saved messages                                       |
 
 ### Configuration

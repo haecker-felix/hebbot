@@ -607,6 +607,7 @@ impl EventCallback {
 
         match command {
             "!clear" => self.clear_command().await,
+            "!details" => self.details_command(&args).await,
             "!help" => self.help_command().await,
             "!list-config" => self.list_config_command().await,
             "!list-projects" => self.list_projects_command().await,
@@ -622,6 +623,7 @@ impl EventCallback {
     async fn help_command(&self) {
         let help = "Available commands: \n\n\
             !clear \n\
+            !details <name> \n\
             !list-config \n\
             !list-projects \n\
             !list-sections \n\
@@ -647,6 +649,31 @@ impl EventCallback {
 
         self.0
             .send_message(&msg, BotMsgType::AdminRoomPlainNotice)
+            .await;
+    }
+
+    async fn details_command(&self, term: &str) {
+        let result_project = self.0.config.project_by_name(term);
+        let result_section = self.0.config.section_by_name(term);
+        let result_reaction = self.0.config.reaction_type_by_emoji(term);
+
+        let msg = if let Some(project) = result_project {
+            project.html_details()
+        } else if let Some(section) = result_section {
+            section.html_details()
+        } else {
+            match result_reaction {
+                ReactionType::Approval => format!("{} is configured as approval emoji.", term),
+                ReactionType::Section(section) => section.unwrap().html_details(),
+                ReactionType::Project(project) => project.unwrap().html_details(),
+                ReactionType::Image => format!("{} is configured as image emoji.", term),
+                ReactionType::Video => format!("{} is configured as video emoji.", term),
+                ReactionType::None => format!("❌ Unable to find details for ”{}”.", term),
+            }
+        };
+
+        self.0
+            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
             .await;
     }
 
