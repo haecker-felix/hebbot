@@ -13,7 +13,7 @@ use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 
-use crate::{render, utils, Config, News, NewsStore, ReactionType};
+use crate::{render, utils, BotMessageType as BotMsgType, Config, News, NewsStore, ReactionType};
 
 #[derive(Clone)]
 pub struct Bot {
@@ -55,18 +55,21 @@ impl Bot {
             admin_room,
         };
 
-        bot.send_message("✅ Started hebbot!", false, true).await;
+        bot.send_message("✅ Started hebbot!", BotMsgType::AdminRoomPlainNotice)
+            .await;
 
         // Send warnings
         let warnings = utils::format_messages(true, &config_result.warnings);
         if !config_result.warnings.is_empty() {
-            bot.send_message(&warnings, true, true).await;
+            bot.send_message(&warnings, BotMsgType::AdminRoomHtmlNotice)
+                .await;
         }
 
         // Send notes
         let notes = utils::format_messages(false, &config_result.notes);
         if !config_result.notes.is_empty() {
-            bot.send_message(&notes, true, true).await;
+            bot.send_message(&notes, BotMsgType::AdminRoomHtmlNotice)
+                .await;
         }
 
         // Setup event handler
@@ -98,24 +101,23 @@ impl Bot {
     }
 
     /// Simplified method for sending a matrix text/html message
-    async fn send_message(&self, msg: &str, html: bool, admin_room: bool) {
-        debug!(
-            "Send message (html: {:?}, admin-room: {:?}): {}",
-            html, admin_room, msg
-        );
+    async fn send_message(&self, msg: &str, msg_type: BotMsgType) {
+        debug!("Send message ({:?}): {}", msg_type, msg);
 
-        let content = if html {
-            AnyMessageEventContent::RoomMessage(MessageEventContent::text_html(msg, msg))
-        } else {
-            AnyMessageEventContent::RoomMessage(MessageEventContent::text_plain(msg))
+        #[rustfmt::skip]
+        let (room, content) = match msg_type{
+            BotMsgType::AdminRoomHtmlNotice => (&self.admin_room, MessageEventContent::notice_html(msg, msg)),
+            BotMsgType::AdminRoomHtmlText => (&self.admin_room, MessageEventContent::text_html(msg, msg)),
+            BotMsgType::AdminRoomPlainText => (&self.admin_room, MessageEventContent::text_plain(msg)),
+            BotMsgType::AdminRoomPlainNotice => (&self.admin_room, MessageEventContent::notice_plain(msg)),
+            BotMsgType::ReportingRoomHtmlText => (&self.reporting_room, MessageEventContent::text_html(msg, msg)),
+            BotMsgType::ReportingRoomPlainText => (&self.reporting_room, MessageEventContent::text_plain(msg)),
+            BotMsgType::ReportingRoomHtmlNotice => (&self.reporting_room, MessageEventContent::notice_html(msg, msg)),
+            BotMsgType::ReportingRoomPlainNotice => (&self.reporting_room, MessageEventContent::notice_plain(msg)),
         };
+
+        let content = AnyMessageEventContent::RoomMessage(content);
         let txn_id = Uuid::new_v4();
-
-        let room = if admin_room {
-            &self.admin_room
-        } else {
-            &self.reporting_room
-        };
 
         room.send(content, Some(txn_id))
             .await
@@ -257,11 +259,15 @@ impl EventCallback {
                 "✅ Thanks for the report {}, I'll store your update!",
                 reporter_display_name
             );
-            self.0.send_message(&msg, false, false).await;
+            self.0
+                .send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
+                .await;
 
             let link = self.message_link(event_id.to_string());
             let msg = format!("✅ {} submitted a news entry. [{}]", member.user_id(), link);
-            self.0.send_message(&msg, true, true).await;
+            self.0
+                .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+                .await;
 
             // remove bot name from message
             let message = utils::remove_bot_name(&message, &bot);
@@ -276,7 +282,9 @@ impl EventCallback {
                 "❌ {}: Your update is too short and was not stored. This limitation was set-up to limit spam.",
                 reporter_display_name
             );
-            self.0.send_message(&msg, false, false).await;
+            self.0
+                .send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
+                .await;
         }
     }
 
@@ -314,7 +322,9 @@ impl EventCallback {
         };
 
         if let Some(message) = message {
-            self.0.send_message(&message, true, true).await;
+            self.0
+                .send_message(&message, BotMsgType::AdminRoomHtmlNotice)
+                .await;
         }
     }
 
@@ -504,7 +514,9 @@ impl EventCallback {
 
         // Send confirm message to admin room
         if let Some(message) = message {
-            self.0.send_message(&message, true, true).await;
+            self.0
+                .send_message(&message, BotMsgType::AdminRoomHtmlNotice)
+                .await;
         }
     }
 
@@ -556,7 +568,9 @@ impl EventCallback {
 
         // Send confirm message to admin room
         if let Some(message) = message {
-            self.0.send_message(&message, true, true).await;
+            self.0
+                .send_message(&message, BotMsgType::AdminRoomHtmlNotice)
+                .await;
         }
     }
 
@@ -573,7 +587,9 @@ impl EventCallback {
         // Check if the sender is a editor (= has the permission to use commands)
         if !self.is_editor(&member).await {
             let msg = "You don’t have the permission to use commands.";
-            self.0.send_message(msg, false, true).await;
+            self.0
+                .send_message(msg, BotMsgType::AdminRoomPlainNotice)
+                .await;
             return;
         }
 
@@ -611,10 +627,12 @@ impl EventCallback {
             !list-sections \n\
             !render \n\
             !restart \n\
-            !say <message>  \n\
+            !say <message> \n\
             !status";
 
-        self.0.send_message(help, false, true).await;
+        self.0
+            .send_message(help, BotMsgType::AdminRoomPlainNotice)
+            .await;
     }
 
     async fn clear_command(&self) {
@@ -627,7 +645,9 @@ impl EventCallback {
             format!("Cleared {} news entries!", news.len())
         };
 
-        self.0.send_message(&msg, false, true).await;
+        self.0
+            .send_message(&msg, BotMsgType::AdminRoomPlainNotice)
+            .await;
     }
 
     async fn list_config_command(&self) {
@@ -639,7 +659,9 @@ impl EventCallback {
         let toml = toml::to_string_pretty(&config).unwrap();
 
         let msg = format!("<pre><code>{}</code></pre>\n", toml);
-        self.0.send_message(&msg, true, true).await;
+        self.0
+            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+            .await;
     }
 
     async fn list_projects_command(&self) {
@@ -654,7 +676,9 @@ impl EventCallback {
         }
 
         let msg = format!("List of projects:\n<pre><code>{}</code></pre>\n", list);
-        self.0.send_message(&msg, true, true).await;
+        self.0
+            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+            .await;
     }
 
     async fn list_sections_command(&self) {
@@ -666,7 +690,9 @@ impl EventCallback {
         }
 
         let msg = format!("List of sections:\n<pre><code>{}</code></pre>\n", list);
-        self.0.send_message(&msg, true, true).await;
+        self.0
+            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+            .await;
     }
 
     async fn render_command(&self, editor: &RoomMember) {
@@ -695,13 +721,17 @@ impl EventCallback {
         // Send warnings
         let warnings = utils::format_messages(true, &result.warnings);
         if !result.warnings.is_empty() {
-            self.0.send_message(&warnings, true, true).await;
+            self.0
+                .send_message(&warnings, BotMsgType::AdminRoomHtmlNotice)
+                .await;
         }
 
         // Send notes
         let notes = utils::format_messages(false, &result.notes);
         if !result.notes.is_empty() {
-            self.0.send_message(&notes, true, true).await;
+            self.0
+                .send_message(&notes, BotMsgType::AdminRoomHtmlNotice)
+                .await;
         }
 
         // Generate a curl command which can get used to download all files (images/videos).
@@ -709,7 +739,10 @@ impl EventCallback {
         files.append(&mut result.videos.clone());
         if !files.is_empty() {
             self.0
-                .send_message("Use this command to download all files:", true, true)
+                .send_message(
+                    "Use this command to download all files:",
+                    BotMsgType::AdminRoomHtmlNotice,
+                )
                 .await;
 
             let mut curl_command = "curl".to_string();
@@ -727,19 +760,23 @@ impl EventCallback {
             }
 
             let msg = format!("<pre><code>{}</code></pre>\n", curl_command);
-            self.0.send_message(&msg, true, true).await;
+            self.0
+                .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+                .await;
         }
     }
 
     async fn restart_command(&self) {
         self.0
-            .send_message("Restarting hebbot…", false, true)
+            .send_message("Restarting hebbot…", BotMsgType::AdminRoomPlainNotice)
             .await;
         Command::new("/proc/self/exe").exec();
     }
 
     async fn say_command(&self, msg: &str) {
-        self.0.send_message(&msg, true, false).await;
+        self.0
+            .send_message(&msg, BotMsgType::ReportingRoomPlainText)
+            .await;
     }
 
     async fn status_command(&self) {
@@ -774,12 +811,16 @@ impl EventCallback {
             )
         };
 
-        self.0.send_message(&msg, true, true).await;
+        self.0
+            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+            .await;
     }
 
     async fn unrecognized_command(&self) {
         let msg = "Unrecognized command. Use !help to list available commands.";
-        self.0.send_message(msg, false, true).await;
+        self.0
+            .send_message(msg, BotMsgType::AdminRoomPlainNotice)
+            .await;
     }
 
     async fn is_editor(&self, member: &RoomMember) -> bool {

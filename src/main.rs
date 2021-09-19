@@ -2,6 +2,7 @@
 extern crate log;
 
 mod bot;
+mod bot_message_type;
 mod config;
 mod error;
 mod news;
@@ -12,6 +13,7 @@ mod render;
 mod section;
 mod utils;
 
+pub use bot_message_type::BotMessageType;
 pub use config::Config;
 pub use error::Error;
 pub use news::News;
