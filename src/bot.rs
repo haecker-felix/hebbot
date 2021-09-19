@@ -606,6 +606,7 @@ impl EventCallback {
         info!("Received command: {} ({})", command, args);
 
         match command {
+            "!about" => self.about_command().await,
             "!clear" => self.clear_command().await,
             "!details" => self.details_command(&args).await,
             "!help" => self.help_command().await,
@@ -622,6 +623,7 @@ impl EventCallback {
 
     async fn help_command(&self) {
         let help = "Available commands: \n\n\
+            !about \n\
             !clear \n\
             !details <name> \n\
             !list-config \n\
@@ -634,6 +636,19 @@ impl EventCallback {
 
         self.0
             .send_message(help, BotMsgType::AdminRoomPlainNotice)
+            .await;
+    }
+
+    async fn about_command(&self) {
+        let version = env!("CARGO_PKG_VERSION");
+
+        let msg = format!(
+            "You are running Hebbot version {}<br>© 2021 Felix Häcker<br><a href=\"https://github.com/haecker-felix/hebbot/\">Open Homepage</a> | <a href=\"https://github.com/haecker-felix/hebbot/issues/new\">Report Issue</a>",
+            version
+        );
+
+        self.0
+            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
             .await;
     }
 

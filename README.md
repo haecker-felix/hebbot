@@ -31,6 +31,7 @@ In this closed room administrative commands can be executed.
 
 | Command         | Description                                                |
 | --------------- | ---------------------------------------------------------- |
+| !about          | Shows bot version details                                  |
 | !clear          | Clears all stored news                                     |
 | !details "term" | Shows section/project details (term can be emoji or name)  |
 | !list-config    | Lists current bot configuration                            |
