@@ -40,7 +40,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     let mut render_projects: BTreeMap<String, RenderProject> = BTreeMap::new();
     let mut render_sections: BTreeMap<String, RenderSection> = BTreeMap::new();
 
-    let news_count = news_list.len();
+    let mut news_count = 0;
     let mut not_approved = 0;
     let mut report_text = String::new();
     let mut project_names: HashSet<String> = HashSet::new();
@@ -71,6 +71,9 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
             warnings.insert(0, format!("[{}] News entry by {} doesn't have project/section information, it'll not appear in the rendered markdown!", message_link, news.reporter_display_name));
             continue;
         }
+
+        // The news entry is approved, and will be rendered -> increase counter.
+        news_count += 1;
 
         // Get news images / videos
         images.append(&mut news.images().clone());
