@@ -63,12 +63,12 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
         // Check if the news entry has multiple project/information set
         if news.project_names().len() > 1 || news.section_names().len() > 1 {
-            warnings.insert(0, format!("[{}] News entry by {} has multiple project or section information set, it'll appear multiple times. This is probably not wanted!", message_link, news.reporter_display_name));
+            warnings.insert(0, format!("[{}] News entry by {} has multiple project or section information set, it’ll appear multiple times. This is probably not wanted!", message_link, news.reporter_display_name));
         }
 
         // Check if the news entry has at one project or section information added
         if news.project_names().is_empty() && news.section_names().is_empty() {
-            warnings.insert(0, format!("[{}] News entry by {} doesn't have project/section information, it'll not appear in the rendered markdown!", message_link, news.reporter_display_name));
+            warnings.insert(0, format!("[{}] News entry by {} doesn’t have project/section information, it’ll not appear in the rendered markdown!", message_link, news.reporter_display_name));
             continue;
         }
 
@@ -81,7 +81,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
         // Add news entries without any project information (but with section information) directly to the specified `RenderSection`
         if news.project_names().is_empty() {
-            notes.insert(0, format!("[{}] News entry by {} doesn't have project information, it'll appear directly in the section without any project description.", message_link, news.reporter_display_name));
+            notes.insert(0, format!("[{}] News entry by {} doesn’t have project information, it’ll appear directly in the section without any project description.", message_link, news.reporter_display_name));
 
             for section_name in news.section_names() {
                 let section = config.section_by_name(&section_name).unwrap();
@@ -114,7 +114,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
             // Handle news entries with sections which don't match the project default_section
             for section_name in news.section_names() {
                 if section_name != project.default_section {
-                    notes.insert(0, format!("[{}] News entry by {} gets added to the \"{}\" section, which is not the default section for this project.", message_link, news.reporter_display_name, section_name));
+                    notes.insert(0, format!("[{}] News entry by {} gets added to the “{}” section, which is not the default section for this project.", message_link, news.reporter_display_name, section_name));
                     overwritten_section = true;
 
                     let custom_project_section_name =

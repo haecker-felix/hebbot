@@ -99,7 +99,7 @@ impl Config {
         {
             warnings.insert(
                 0,
-                "At least one emoji isn't configured. The bot will not work properly.".to_string(),
+                "At least one emoji isn’t configured. The bot will not work properly.".to_string(),
             );
         }
 
@@ -140,7 +140,7 @@ impl Config {
                 warnings.insert(
                     0,
                     format!(
-                        "Section \"{}\" doesn't have an emoji, this can lead to undefined behavior.",
+                        "Section “{}” doesn’t have an emoji, this can lead to undefined behavior.",
                         section.name
                     ),
                 );
@@ -160,7 +160,7 @@ impl Config {
                 warnings.insert(
                     0,
                     format!(
-                        "Project \"{}\" doesn't have an emoji, this can lead to undefined behavior.",
+                        "Project “{}” doesn’t have an emoji, this can lead to undefined behavior.",
                         project.name
                     ),
                 );
@@ -169,7 +169,7 @@ impl Config {
                 warnings.insert(
                     0,
                     format!(
-                        "Project \"{}\" doesn't have a default section, this can lead to undefined behavior.",
+                        "Project “{}” doesn’t have a default section, this can lead to undefined behavior.",
                         project.name
                     ),
                 );
@@ -180,7 +180,7 @@ impl Config {
                 warnings.insert(
                     0,
                     format!(
-                        "Project \"{}\" has an unknown default section \"{}\", this can lead to undefined behavior.",
+                        "Project “{}” has an unknown default section “{}”, this can lead to undefined behavior.",
                         project.name,
                         project.default_section
                     ),
