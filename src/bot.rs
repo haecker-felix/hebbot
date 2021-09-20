@@ -36,13 +36,37 @@ impl Bot {
 
         Self::login(&client, user.localpart(), &config.bot_password).await;
 
-        // Get matrix rooms
-        let reporting_room_id = RoomId::try_from(config.reporting_room_id.as_str()).unwrap();
+        // Get matrix rooms IDs
+        let reporting_room_id = RoomId::try_from(config.reporting_room_id.as_str()).unwrap();            
+        let admin_room_id = RoomId::try_from(config.admin_room_id.as_str()).unwrap();
+
+        // Try to accept reporting room invite, if any
+        if let Some(invited_room) = client.get_invited_room(&reporting_room_id) {
+            invited_room
+                .accept_invitation()
+                .await
+                .expect("Hebbot could not join the reporting room");
+        }
+    
+        // Try to accept admin room invite, if any
+        if let Some(invited_room) = client.get_invited_room(&admin_room_id) {
+            invited_room
+                .accept_invitation()
+                .await
+                .expect("Hebbot could not join the admin room");
+        }
+
+        // Sync to make sure that the bot is aware of the newly joined rooms
+        client
+            .sync_once(SyncSettings::new())
+            .await
+            .expect("Unable to sync");
+        
+
         let reporting_room = client
             .get_joined_room(&reporting_room_id)
             .expect("Unable to get reporting room");
 
-        let admin_room_id = RoomId::try_from(config.admin_room_id.as_str()).unwrap();
         let admin_room = client
             .get_joined_room(&admin_room_id)
             .expect("Unable to get admin room");
