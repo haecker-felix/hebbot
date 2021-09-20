@@ -65,7 +65,7 @@ impl Bot {
 
         let reporting_room = client
             .get_joined_room(&reporting_room_id)
-            .expect("Unable to join the reporting room");
+            .expect("Unable to get reporting room");
 
         let admin_room = client
             .get_joined_room(&admin_room_id)
