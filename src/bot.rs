@@ -39,8 +39,18 @@ impl Bot {
         // Get matrix rooms
         let reporting_room_id = RoomId::try_from(config.reporting_room_id.as_str()).unwrap();
         let reporting_room = client
-            .get_joined_room(&reporting_room_id)
-            .expect("Unable to get reporting room");
+            .get_joined_room(&reporting_room_id);
+        
+        let reporting_room = match reporting_room {
+            None => {
+                client
+                    .get_invited_room(&reporting_room_id)
+                    .expect("Not invited to the reporting room")
+                    .accept_invitation().await.expect("Hebbot could not join the reporting room");
+                client.get_joined_room(&reporting_room_id).expect("Hebbot failed to join")
+            }
+            Some(reporting_room) => reporting_room,
+        };
 
         let admin_room_id = RoomId::try_from(config.admin_room_id.as_str()).unwrap();
         let admin_room = client
