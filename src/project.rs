@@ -8,6 +8,7 @@ pub struct Project {
     pub description: String,
     pub website: String,
     pub default_section: String,
+    pub usual_reporters: Vec<String>,
 }
 
 impl Project {
@@ -18,7 +19,8 @@ impl Project {
             <b>Name</b>: {} ({}) <br>\
             <b>Description</b>: {} <br>\
             <b>Website</b>: {} <br>\
-            <b>Default Section</b>: {}",
+            <b>Default Section</b>: {} <br>\
+            <b>Usual reporters: PLACEHOLDER FIXME LATER</b>",
             self.emoji, self.title, self.name, self.description, self.website, self.default_section
         )
     }

@@ -88,6 +88,17 @@ impl Config {
         ReactionType::None
     }
 
+    pub fn projects_by_usual_reporter(&self, reporter_mxid: &str) -> Vec<Project> {
+        let mut projects_for_this_reporter = Vec::<Project>::new();
+        for project in &self.projects {
+            if project.usual_reporters.contains(&String::from(reporter_mxid)) {
+                projects_for_this_reporter.push(project.clone())
+            }
+        }
+
+        projects_for_this_reporter
+    }
+    
     fn validate_config(config: Self) -> ConfigResult {
         let mut warnings = Vec::new();
         let mut notes = Vec::new();
