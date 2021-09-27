@@ -149,11 +149,11 @@ impl Bot {
     }
 
     /// Simplified method for sending a reaction emoji
-    async fn send_reaction(&self, reaction: &str, event_id: &EventId) {
-        let content = ReactionEventContent::new(Relation::new(event_id.clone(), reaction.to_string()));
+    async fn send_reaction(&self, reaction: &str, msg_event_id: &EventId) {
+        let content = ReactionEventContent::new(Relation::new(msg_event_id.clone(), reaction.to_string()));
         let content = AnyMessageEventContent::Reaction(content);
-        //println!("I should add the {} emoji eventually!", reaction);
         let txn_id = Uuid::new_v4();
+
         self.reporting_room.send(content, Some(txn_id))
             .await
             .expect("Unable to send reaction");
@@ -283,7 +283,6 @@ impl EventCallback {
             return;
         }
 
-        //let event_id = event_id.to_string();
         let reporter_id = member.user_id().to_string();
         let reporter_display_name = utils::get_member_display_name(&member);
         let bot = self.0.client.user_id().await.unwrap();
