@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use matrix_sdk::room::{Joined, Room};
 use matrix_sdk::uuid::Uuid;
 use matrix_sdk::{Client, EventHandler, RoomMember, SyncSettings};
-use ruma::events::reaction::ReactionEventContent;
+use ruma::events::reaction::{ReactionEventContent,Relation};
 use ruma::events::room::message::{FileMessageEventContent, MessageEventContent, MessageType};
 use ruma::events::room::redaction::SyncRedactionEvent;
 use ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
@@ -149,9 +149,14 @@ impl Bot {
     }
 
     /// Simplified method for sending a reaction emoji
-    async fn send_reactions(&self, reaction: &str, event_id: &EventId) {
-        // TODO
-        println!("I should add the {} emoji eventually!", reaction);
+    async fn send_reaction(&self, reaction: &str, event_id: &EventId) {
+        let content = ReactionEventContent::new(Relation::new(event_id.clone(), reaction.to_string()));
+        let content = AnyMessageEventContent::Reaction(content);
+        //println!("I should add the {} emoji eventually!", reaction);
+        let txn_id = Uuid::new_v4();
+        self.reporting_room.send(content, Some(txn_id))
+            .await
+            .expect("Unable to send reaction");
     }
 
     /// Simplified method for sending a file
@@ -310,7 +315,7 @@ impl EventCallback {
 
             // Pre-populate with emojis to facilitate the editor's work
             for project in self.0.config.projects_by_usual_reporter(&reporter_id) {
-                self.0.send_reactions(&project.emoji, event_id).await;
+                self.0.send_reaction(&project.emoji, event_id).await;
             }
         } else {
             let msg = format!(
