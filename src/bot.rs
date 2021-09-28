@@ -381,7 +381,7 @@ impl EventCallback {
         related_message_type: &MessageType,
     ) {
         // Check if the sender is a editor (= has the permission to use emoji "commands")
-        if !self.is_editor(&reaction_sender).await {
+        if !self.is_editor(&reaction_sender).await || reaction_sender.user_id().as_str() == self.0.config.bot_user_id {
             return;
         }
 
