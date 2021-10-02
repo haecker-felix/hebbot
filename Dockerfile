@@ -8,7 +8,7 @@ COPY Cargo.lock .
 COPY Cargo.toml .
 COPY ./src src
 
-RUN cargo install --path .
+RUN cargo install --locked --path .
 
 
 # Final stage
