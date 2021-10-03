@@ -1,10 +1,11 @@
 services:
   hebbot:
-    image: haeckerfelix/hebbot:v2.1
+    image: haeckerfelix/hebbot:latest
     restart: unless-stopped
     volumes:
       - hebbot_data:/data
     environment:
+      - BOT_PASSWORD=secretpassword
       - CONFIG_PATH=/data/config.toml
       - TEMPLATE_PATH=/data/template.md
       - STORE_PATH=/data/store.json

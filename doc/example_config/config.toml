@@ -1,5 +1,4 @@
 bot_user_id = '@botname:domain.org'
-bot_password = 'supersecurepassword'
 reporting_room_id = '!roomid:domain.org'
 admin_room_id = '!adminroomid:domain.org'
 approval_emoji = '⭕'
