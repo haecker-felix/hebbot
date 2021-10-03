@@ -36,6 +36,8 @@ impl Config {
             Err(_) => "./config.toml".to_string(),
         };
 
+        debug!("Trying to read configuration file from path: {:?}", path);
+
         let mut file = File::open(path).expect("Unable to open configuration file");
         let mut data = String::new();
         file.read_to_string(&mut data)

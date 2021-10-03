@@ -15,6 +15,8 @@ impl NewsStore {
     pub fn read() -> Self {
         // Try to open+read store.json
         let path = Self::get_path();
+        debug!("Trying to read stored news file from path: {:?}", path);
+
         let news_map: HashMap<String, News> = if let Ok(mut file) = File::open(path) {
             let mut data = String::new();
             file.read_to_string(&mut data)

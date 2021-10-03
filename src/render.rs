@@ -238,6 +238,8 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
         Err(_) => "./template.md".to_string(),
     };
 
+    debug!("Trying to read template file from path: {:?}", path);
+
     let mut file = File::open(path).expect("Unable to open template file");
     let mut template = String::new();
     file.read_to_string(&mut template)
