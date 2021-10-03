@@ -373,7 +373,7 @@ impl EventCallback {
             let news_store = self.0.news_store.lock().unwrap();
 
             let reaction_event_id = reaction_event_id.to_string();
-            let reaction_type = self.0.config.reaction_type_by_emoji(&reaction_emoji);
+            let reaction_type = self.0.config.reaction_type_by_emoji(reaction_emoji);
             let related_event_id = related_event.event_id().to_string();
             let related_event_timestamp: DateTime<Utc> = related_event
                 .origin_server_ts()
@@ -548,7 +548,7 @@ impl EventCallback {
     /// - Or a message itself got deleted / redacted
     async fn on_reporting_room_redaction(&self, member: &RoomMember, redacted_event_id: &EventId) {
         let message = {
-            let is_editor = self.is_editor(&member).await;
+            let is_editor = self.is_editor(member).await;
             let mut news_store = self.0.news_store.lock().unwrap();
             let redacted_event_id = redacted_event_id.to_string();
             let link = self.message_link(redacted_event_id.clone());

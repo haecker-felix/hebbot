@@ -10,7 +10,7 @@ use ruma::{EventId, UserId};
 
 /// Get room message by event id
 pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyRoomEvent> {
-    let request = Request::new(room.room_id(), &event_id);
+    let request = Request::new(room.room_id(), event_id);
     let event = room.event(request).await.ok()?.event.deserialize().ok()?;
 
     Some(event)
@@ -110,11 +110,11 @@ pub fn emoji_cmp(a: &str, b: &str) -> bool {
 pub fn remove_bot_name(message: &str, bot: &UserId) -> String {
     let regex = format!("(?i)^@?{}(:{})?:?", bot.localpart(), bot.server_name());
     let re = Regex::new(&regex).unwrap();
-    let message = re.replace(&message, "");
+    let message = re.replace(message, "");
     message.trim().to_string()
 }
 
-pub fn format_messages(is_warning: bool, list: &Vec<String>) -> String {
+pub fn format_messages(is_warning: bool, list: &[String]) -> String {
     let emoji = if is_warning { "⚠️" } else { "ℹ️" };
 
     let mut messages = String::new();
