@@ -269,7 +269,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     template = template.replace("{{projects}}", &projects);
     template = template.replace("{{today}}", &today);
     template = template.replace("{{author}}", &display_name);
-    template = template.replace("{{report}}", &report_text.trim());
+    template = template.replace("{{report}}", report_text.trim());
 
     // Rerverse order to make it more easy to read
     warnings.reverse();
