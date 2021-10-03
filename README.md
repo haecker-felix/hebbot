@@ -55,7 +55,7 @@ Example docker-compose:
 ```
 services:
   hebbot:
-    image: haeckerfelix/hebbot:v2.0
+    image: haeckerfelix/hebbot:v2.1
     restart: unless-stopped
     volumes:
       - hebbot_data:/data
