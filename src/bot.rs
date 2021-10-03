@@ -37,7 +37,7 @@ impl Bot {
         Self::login(&client, user.localpart(), &config.bot_password).await;
 
         // Get matrix rooms IDs
-        let reporting_room_id = RoomId::try_from(config.reporting_room_id.as_str()).unwrap();            
+        let reporting_room_id = RoomId::try_from(config.reporting_room_id.as_str()).unwrap();
         let admin_room_id = RoomId::try_from(config.admin_room_id.as_str()).unwrap();
 
         // Try to accept reporting room invite, if any
@@ -47,7 +47,7 @@ impl Bot {
                 .await
                 .expect("Hebbot could not join the reporting room");
         }
-    
+
         // Try to accept admin room invite, if any
         if let Some(invited_room) = client.get_invited_room(&admin_room_id) {
             invited_room
@@ -61,7 +61,6 @@ impl Bot {
             .sync_once(SyncSettings::new())
             .await
             .expect("Unable to sync");
-        
 
         let reporting_room = client
             .get_joined_room(&reporting_room_id)
