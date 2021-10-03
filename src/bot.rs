@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use matrix_sdk::room::{Joined, Room};
 use matrix_sdk::uuid::Uuid;
 use matrix_sdk::{Client, EventHandler, RoomMember, SyncSettings};
-use ruma::events::reaction::ReactionEventContent;
+use ruma::events::reaction::{ReactionEventContent, Relation};
 use ruma::events::room::message::{FileMessageEventContent, MessageEventContent, MessageType};
 use ruma::events::room::redaction::SyncRedactionEvent;
 use ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
@@ -147,6 +147,19 @@ impl Bot {
             .expect("Unable to send message");
     }
 
+    /// Simplified method for sending a reaction emoji
+    async fn send_reaction(&self, reaction: &str, msg_event_id: &EventId) {
+        let content =
+            ReactionEventContent::new(Relation::new(msg_event_id.clone(), reaction.to_string()));
+        let content = AnyMessageEventContent::Reaction(content);
+        let txn_id = Uuid::new_v4();
+
+        self.reporting_room
+            .send(content, Some(txn_id))
+            .await
+            .expect("Unable to send reaction");
+    }
+
     /// Simplified method for sending a file
     async fn send_file(&self, url: MxcUri, filename: String, admin_room: bool) {
         debug!("Send file (url: {:?}, admin-room: {:?})", url, admin_room);
@@ -271,7 +284,6 @@ impl EventCallback {
             return;
         }
 
-        let event_id = event_id.to_string();
         let reporter_id = member.user_id().to_string();
         let reporter_display_name = utils::get_member_display_name(member);
         let bot = self.0.client.user_id().await.unwrap();
@@ -296,10 +308,23 @@ impl EventCallback {
             let message = utils::remove_bot_name(&message, &bot);
 
             // Create new news entry...
-            let news = News::new(event_id, reporter_id, reporter_display_name, message);
+            let news = News::new(
+                event_id.clone().to_string(),
+                reporter_id.clone(),
+                reporter_display_name,
+                message,
+            );
 
             // ...and save it for the next report!
             self.0.news_store.lock().unwrap().add_news(news);
+
+            // Pre-populate with emojis to facilitate the editor's work
+            for project in self.0.config.projects_by_usual_reporter(&reporter_id) {
+                self.0.send_reaction(&project.emoji, event_id).await;
+            }
+            for section in self.0.config.sections_by_usual_reporter(&reporter_id) {
+                self.0.send_reaction(&section.emoji, event_id).await;
+            }
         } else {
             let msg = format!(
                 "❌ {}: Your update is too short and was not stored. This limitation was set-up to limit spam.",
@@ -365,7 +390,9 @@ impl EventCallback {
         related_message_type: &MessageType,
     ) {
         // Check if the sender is a editor (= has the permission to use emoji "commands")
-        if !self.is_editor(reaction_sender).await {
+        if !self.is_editor(reaction_sender).await
+            || reaction_sender.user_id().as_str() == self.0.config.bot_user_id
+        {
             return;
         }
 
