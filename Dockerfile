@@ -1,6 +1,6 @@
 # Build stage
 
-FROM rust:1.53-buster as cargo-build
+FROM rust:1.55-buster as cargo-build
 RUN apt-get update && apt-get -y install libolm-dev cmake
 
 WORKDIR /usr/src/hebbot
@@ -8,7 +8,7 @@ COPY Cargo.lock .
 COPY Cargo.toml .
 COPY ./src src
 
-RUN cargo install --path .
+RUN cargo install --locked --path .
 
 
 # Final stage
