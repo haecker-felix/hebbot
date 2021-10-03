@@ -315,6 +315,10 @@ impl EventCallback {
             for project in self.0.config.projects_by_usual_reporter(&reporter_id) {
                 self.0.send_reaction(&project.emoji, event_id).await;
             }
+            for section in self.0.config.sectionss_by_usual_reporter(&reporter_id) {
+                self.0.send_reaction(&section.emoji, event_id).await;
+            }
+            
         } else {
             let msg = format!(
                 "❌ {}: Your update is too short and was not stored. This limitation was set-up to limit spam.",

@@ -7,6 +7,7 @@ pub struct Section {
     pub name: String,
     pub title: String,
     pub order: u32,
+    pub usual_reporters: Vec<String>,
 }
 
 impl Section {
