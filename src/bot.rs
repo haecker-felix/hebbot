@@ -9,6 +9,7 @@ use ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
 use ruma::{EventId, MxcUri, RoomId, UserId};
 
 use std::convert::TryFrom;
+use std::env;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -31,10 +32,12 @@ impl Bot {
         let news_store = Arc::new(Mutex::new(NewsStore::read()));
 
         let username = config.bot_user_id.as_str();
+        let password = env::var("BOT_PASSWORD").expect("BOT_PASSWORD env variable not specified");
+
         let user = UserId::try_from(username).expect("Unable to parse bot user id");
         let client = Client::new_from_user_id(user.clone()).await.unwrap();
 
-        Self::login(&client, user.localpart(), &config.bot_password).await;
+        Self::login(&client, user.localpart(), &password).await;
 
         // Get matrix rooms IDs
         let reporting_room_id = RoomId::try_from(config.reporting_room_id.as_str()).unwrap();
@@ -743,11 +746,7 @@ impl EventCallback {
     }
 
     async fn list_config_command(&self) {
-        let mut config = self.0.config.clone();
-
-        // Don't print bot password
-        config.bot_password = "".to_string();
-
+        let config = self.0.config.clone();
         let toml = toml::to_string_pretty(&config).unwrap();
 
         let msg = format!("<pre><code>{}</code></pre>\n", toml);

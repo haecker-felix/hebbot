@@ -10,7 +10,6 @@ use crate::{utils, Project, ReactionType, Section};
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
     pub bot_user_id: String,
-    pub bot_password: String,
     pub reporting_room_id: String,
     pub admin_room_id: String,
     pub approval_emoji: String,
