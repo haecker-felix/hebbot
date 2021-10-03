@@ -26,7 +26,7 @@ impl Project {
 
         let mut reporters = String::new();
         for usual_reporter in &self.usual_reporters {
-            reporters = reporters + &usual_reporter + ", ";
+            reporters = reporters + usual_reporter + ", ";
         }
 
         reporters.pop();
