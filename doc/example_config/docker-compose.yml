@@ -1,0 +1,13 @@
+services:
+  hebbot:
+    image: haeckerfelix/hebbot:v2.1
+    restart: unless-stopped
+    volumes:
+      - hebbot_data:/data
+    environment:
+      - CONFIG_PATH=/data/config.toml
+      - TEMPLATE_PATH=/data/template.md
+      - STORE_PATH=/data/store.json
+
+volumes:
+  hebbot_data:
