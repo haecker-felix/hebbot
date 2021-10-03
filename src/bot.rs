@@ -37,7 +37,7 @@ impl Bot {
         Self::login(&client, user.localpart(), &config.bot_password).await;
 
         // Get matrix rooms IDs
-        let reporting_room_id = RoomId::try_from(config.reporting_room_id.as_str()).unwrap();            
+        let reporting_room_id = RoomId::try_from(config.reporting_room_id.as_str()).unwrap();
         let admin_room_id = RoomId::try_from(config.admin_room_id.as_str()).unwrap();
 
         // Try to accept reporting room invite, if any
@@ -47,7 +47,7 @@ impl Bot {
                 .await
                 .expect("Hebbot could not join the reporting room");
         }
-    
+
         // Try to accept admin room invite, if any
         if let Some(invited_room) = client.get_invited_room(&admin_room_id) {
             invited_room
@@ -61,7 +61,6 @@ impl Bot {
             .sync_once(SyncSettings::new())
             .await
             .expect("Unable to sync");
-        
 
         let reporting_room = client
             .get_joined_room(&reporting_room_id)
@@ -219,7 +218,7 @@ impl EventHandler for EventCallback {
                     if room.room_id() == self.0.reporting_room.room_id() {
                         self.on_reporting_room_reaction(
                             &reaction_sender,
-                            &emoji,
+                            emoji,
                             &reaction_event_id,
                             &related_event,
                             &related_msg_type,
@@ -274,7 +273,7 @@ impl EventCallback {
 
         let event_id = event_id.to_string();
         let reporter_id = member.user_id().to_string();
-        let reporter_display_name = utils::get_member_display_name(&member);
+        let reporter_display_name = utils::get_member_display_name(member);
         let bot = self.0.client.user_id().await.unwrap();
 
         // Check min message length
@@ -366,7 +365,7 @@ impl EventCallback {
         related_message_type: &MessageType,
     ) {
         // Check if the sender is a editor (= has the permission to use emoji "commands")
-        if !self.is_editor(&reaction_sender).await {
+        if !self.is_editor(reaction_sender).await {
             return;
         }
 
@@ -374,7 +373,7 @@ impl EventCallback {
             let news_store = self.0.news_store.lock().unwrap();
 
             let reaction_event_id = reaction_event_id.to_string();
-            let reaction_type = self.0.config.reaction_type_by_emoji(&reaction_emoji);
+            let reaction_type = self.0.config.reaction_type_by_emoji(reaction_emoji);
             let related_event_id = related_event.event_id().to_string();
             let related_event_timestamp: DateTime<Utc> = related_event
                 .origin_server_ts()
@@ -549,7 +548,7 @@ impl EventCallback {
     /// - Or a message itself got deleted / redacted
     async fn on_reporting_room_redaction(&self, member: &RoomMember, redacted_event_id: &EventId) {
         let message = {
-            let is_editor = self.is_editor(&member).await;
+            let is_editor = self.is_editor(member).await;
             let mut news_store = self.0.news_store.lock().unwrap();
             let redacted_event_id = redacted_event_id.to_string();
             let link = self.message_link(redacted_event_id.clone());
@@ -609,7 +608,7 @@ impl EventCallback {
         }
 
         // Check if the sender is a editor (= has the permission to use commands)
-        if !self.is_editor(&member).await {
+        if !self.is_editor(member).await {
             let msg = "You don’t have the permission to use commands.";
             self.0
                 .send_message(msg, BotMsgType::AdminRoomPlainNotice)
@@ -632,14 +631,14 @@ impl EventCallback {
         match command {
             "!about" => self.about_command().await,
             "!clear" => self.clear_command().await,
-            "!details" => self.details_command(&args).await,
+            "!details" => self.details_command(args).await,
             "!help" => self.help_command().await,
             "!list-config" => self.list_config_command().await,
             "!list-projects" => self.list_projects_command().await,
             "!list-sections" => self.list_sections_command().await,
             "!render" => self.render_command(member).await,
             "!restart" => self.restart_command().await,
-            "!say" => self.say_command(&args).await,
+            "!say" => self.say_command(args).await,
             "!status" => self.status_command().await,
             _ => self.unrecognized_command().await,
         }
@@ -841,7 +840,7 @@ impl EventCallback {
 
     async fn say_command(&self, msg: &str) {
         self.0
-            .send_message(&msg, BotMsgType::ReportingRoomPlainText)
+            .send_message(msg, BotMsgType::ReportingRoomPlainText)
             .await;
     }
 
