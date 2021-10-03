@@ -104,7 +104,7 @@ impl Config {
         projects_for_this_reporter
     }
 
-    pub fn sectionss_by_usual_reporter(&self, reporter_mxid: &str) -> Vec<Section> {
+    pub fn sections_by_usual_reporter(&self, reporter_mxid: &str) -> Vec<Section> {
         let mut sections_for_this_reporter = Vec::<Section>::new();
         for section in &self.sections {
             if section

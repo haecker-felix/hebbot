@@ -322,7 +322,7 @@ impl EventCallback {
             for project in self.0.config.projects_by_usual_reporter(&reporter_id) {
                 self.0.send_reaction(&project.emoji, event_id).await;
             }
-            for section in self.0.config.sectionss_by_usual_reporter(&reporter_id) {
+            for section in self.0.config.sections_by_usual_reporter(&reporter_id) {
                 self.0.send_reaction(&section.emoji, event_id).await;
             }
         } else {
