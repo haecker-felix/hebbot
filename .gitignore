@@ -1,11 +1,11 @@
 /target
 /cargo-home
 .buildconfig
-config.json
-config.toml
-store.json
+./config.json
+./config.toml
+./store.json
 backup.json
-template.md
+./template.md
 *.json~
 start-ra.sh
 .flatpak
