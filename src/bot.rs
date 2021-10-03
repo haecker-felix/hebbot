@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use matrix_sdk::room::{Joined, Room};
 use matrix_sdk::uuid::Uuid;
 use matrix_sdk::{Client, EventHandler, RoomMember, SyncSettings};
-use ruma::events::reaction::{ReactionEventContent,Relation};
+use ruma::events::reaction::{ReactionEventContent, Relation};
 use ruma::events::room::message::{FileMessageEventContent, MessageEventContent, MessageType};
 use ruma::events::room::redaction::SyncRedactionEvent;
 use ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
@@ -149,11 +149,13 @@ impl Bot {
 
     /// Simplified method for sending a reaction emoji
     async fn send_reaction(&self, reaction: &str, msg_event_id: &EventId) {
-        let content = ReactionEventContent::new(Relation::new(msg_event_id.clone(), reaction.to_string()));
+        let content =
+            ReactionEventContent::new(Relation::new(msg_event_id.clone(), reaction.to_string()));
         let content = AnyMessageEventContent::Reaction(content);
         let txn_id = Uuid::new_v4();
 
-        self.reporting_room.send(content, Some(txn_id))
+        self.reporting_room
+            .send(content, Some(txn_id))
             .await
             .expect("Unable to send reaction");
     }
@@ -306,7 +308,12 @@ impl EventCallback {
             let message = utils::remove_bot_name(&message, &bot);
 
             // Create new news entry...
-            let news = News::new(event_id.clone().to_string(), reporter_id.clone(), reporter_display_name, message);
+            let news = News::new(
+                event_id.clone().to_string(),
+                reporter_id.clone(),
+                reporter_display_name,
+                message,
+            );
 
             // ...and save it for the next report!
             self.0.news_store.lock().unwrap().add_news(news);
@@ -318,7 +325,6 @@ impl EventCallback {
             for section in self.0.config.sectionss_by_usual_reporter(&reporter_id) {
                 self.0.send_reaction(&section.emoji, event_id).await;
             }
-            
         } else {
             let msg = format!(
                 "❌ {}: Your update is too short and was not stored. This limitation was set-up to limit spam.",
@@ -384,7 +390,9 @@ impl EventCallback {
         related_message_type: &MessageType,
     ) {
         // Check if the sender is a editor (= has the permission to use emoji "commands")
-        if !self.is_editor(reaction_sender).await || reaction_sender.user_id().as_str() == self.0.config.bot_user_id {
+        if !self.is_editor(reaction_sender).await
+            || reaction_sender.user_id().as_str() == self.0.config.bot_user_id
+        {
             return;
         }
 

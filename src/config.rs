@@ -93,7 +93,10 @@ impl Config {
     pub fn projects_by_usual_reporter(&self, reporter_mxid: &str) -> Vec<Project> {
         let mut projects_for_this_reporter = Vec::<Project>::new();
         for project in &self.projects {
-            if project.usual_reporters.contains(&String::from(reporter_mxid)) {
+            if project
+                .usual_reporters
+                .contains(&String::from(reporter_mxid))
+            {
                 projects_for_this_reporter.push(project.clone())
             }
         }
@@ -104,14 +107,17 @@ impl Config {
     pub fn sectionss_by_usual_reporter(&self, reporter_mxid: &str) -> Vec<Section> {
         let mut sections_for_this_reporter = Vec::<Section>::new();
         for section in &self.sections {
-            if section.usual_reporters.contains(&String::from(reporter_mxid)) {
+            if section
+                .usual_reporters
+                .contains(&String::from(reporter_mxid))
+            {
                 sections_for_this_reporter.push(section.clone())
             }
         }
 
         sections_for_this_reporter
     }
-    
+
     fn validate_config(config: Self) -> ConfigResult {
         let mut warnings = Vec::new();
         let mut notes = Vec::new();
