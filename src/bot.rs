@@ -366,175 +366,206 @@ impl EventCallback {
         related_message_type: &MessageType,
     ) {
         // Check if the sender is a editor (= has the permission to use emoji "commands")
+        let mut message = Option::<String>::None;
         if !self.is_editor(&reaction_sender).await {
-            return;
-        }
+            // Non editors can only use the notification emoji
+            if utils::emoji_cmp(reaction_emoji, &self.0.config.notification_emoji) {
+                message = {
+                    let news_store = self.0.news_store.lock().unwrap();
 
-        let message: Option<String> = {
-            let news_store = self.0.news_store.lock().unwrap();
+                    let related_event_id = related_event.event_id().to_string();
+                    let link = self.message_link(related_event_id.clone());
 
-            let reaction_event_id = reaction_event_id.to_string();
-            let reaction_type = self.0.config.reaction_type_by_emoji(&reaction_emoji);
-            let related_event_id = related_event.event_id().to_string();
-            let related_event_timestamp: DateTime<Utc> = related_event
-                .origin_server_ts()
-                .to_system_time()
-                .unwrap()
-                .into();
-            let link = self.message_link(related_event_id.clone());
-
-            if reaction_type == ReactionType::None {
-                debug!(
-                    "Ignoring emoji reaction, doesn't match any known emoji ({:?})",
-                    reaction_emoji
-                );
-                return;
-            }
-
-            let msg = match related_message_type {
-                MessageType::Text(_) => {
-                    let msg = if let Some(news) = news_store.news_by_message_id(&related_event_id) {
-                        match reaction_type {
-                            ReactionType::Approval => {
-                                news.add_approval(reaction_event_id);
-                                Some(format!(
-                                    "✅ Editor {} approved {}'s news entry. [{}]",
-                                    reaction_sender.user_id().to_string(),
-                                    news.reporter_id,
-                                    link
-                                ))
-                            }
-                            ReactionType::Section(section) => {
-                                let section = section.unwrap();
-                                news.add_section_name(reaction_event_id, section.name);
-                                Some(format!(
-                                    "✅ Editor {} added {}’s news entry [{}] to the “{}” section.",
-                                    reaction_sender.user_id().to_string(),
-                                    news.reporter_id,
-                                    link,
-                                    section.title
-                                ))
-                            }
-                            ReactionType::Project(project) => {
-                                let project = project.unwrap();
-                                news.add_project_name(reaction_event_id, project.name);
-                                Some(format!(
-                                    "✅ Editor {} added the project description “{}” to {}’s news entry [{}].",
-                                    reaction_sender.user_id().to_string(),
-                                    project.title,
-                                    news.reporter_id,
-                                    link
-                                ))
-                            }
-                            ReactionType::Image => {
-                                Some(format!(
-                                    "❌ It’s not possible to save {}’s news entry as image (only image messages are supported) [{}].",
-                                    news.reporter_id,
-                                    link
-                                ))
-                            }
-                            ReactionType::Video => {
-                                Some(format!(
-                                    "❌ It’s not possible to save {}’s news entry as video (only video messages are supported) [{}].",
-                                    news.reporter_id,
-                                    link
-                                ))
-                            }
-                            _ => None,
+                    let msg = match related_message_type {
+                        MessageType::Text(_) => {
+                            // TODO Check if the news already exists
+                            // TODO if it does, do nothing
+                            // TODO if it doesn't, add it to the news store
+                            Some(format!(
+                                "{} added the notification emoji to {}", // TODO to which eventid?
+                                reaction_sender.user_id().to_string(),
+                                link
+                            ))
                         }
-                    } else {
-                        Some(format!(
-                            "❌ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
-                            reaction_sender.user_id().to_string(),
-                            reaction_type,
-                            link,
-                            related_event_id
-                        ))
+                        _ => Some(format!(
+                                "{} added the notification emoji to a non-text message",
+                                reaction_sender.user_id().to_string()
+                            ))
                     };
                     msg
-                }
-                MessageType::Image(image) => match reaction_type {
-                    ReactionType::Image => {
-                        let reporter_id = reaction_sender.user_id().to_string();
-                        if let Some(news) = news_store.find_related_news(
-                            &related_event.sender().to_string(),
-                            &related_event_timestamp,
-                        ) {
-                            if let Some(mxc_uri) = &image.url {
-                                news.add_image(
-                                    reaction_event_id,
-                                    image.body.clone(),
-                                    mxc_uri.clone(),
-                                );
-                                Some(format!(
-                                    "✅ Added image to {}’s news entry (“{}”) [{}].",
-                                    news.reporter_id,
-                                    news.message_summary(),
-                                    link
-                                ))
-                            } else {
-                                None
-                            }
-                        } else {
-                            Some(format!(
-                                "❌ Unable to save {}’s image, no matching news entry found ({}).",
-                                reporter_id, link
-                            ))
-                        }
-                    }
-                    _ => Some(format!(
-                        "❌ Invalid reaction emoji {} by {} for message type image [{}].",
-                        reaction_emoji,
-                        reaction_sender.user_id().to_string(),
-                        link
-                    )),
-                },
-                MessageType::Video(video) => match reaction_type {
-                    ReactionType::Video => {
-                        let reporter_id = reaction_sender.user_id().to_string();
-                        if let Some(news) = news_store.find_related_news(
-                            &related_event.sender().to_string(),
-                            &related_event_timestamp,
-                        ) {
-                            if let Some(mxc_uri) = &video.url {
-                                news.add_video(
-                                    reaction_event_id,
-                                    video.body.clone(),
-                                    mxc_uri.clone(),
-                                );
-                                Some(format!(
-                                    "✅ Added video to {}’s news entry (“{}”) [{}].",
-                                    news.reporter_id,
-                                    news.message_summary(),
-                                    link
-                                ))
-                            } else {
-                                None
-                            }
-                        } else {
-                            Some(format!(
-                                "❌ Unable to save {}’s video, no matching news entry found ({}).",
-                                reporter_id, link
-                            ))
-                        }
-                    }
-                    _ => Some(format!(
-                        "❌ Invalid reaction emoji by {} for message type video [{}].",
-                        reaction_sender.user_id().to_string(),
-                        link
-                    )),
-                },
-                _ => {
+                };
+            }
+        } else {
+            message = {
+                let news_store = self.0.news_store.lock().unwrap();
+
+                let reaction_event_id = reaction_event_id.to_string();
+                let reaction_type = self.0.config.reaction_type_by_emoji(&reaction_emoji);
+                let related_event_id = related_event.event_id().to_string();
+                let related_event_timestamp: DateTime<Utc> = related_event
+                    .origin_server_ts()
+                    .to_system_time()
+                    .unwrap()
+                    .into();
+                let link = self.message_link(related_event_id.clone());
+
+                if reaction_type == ReactionType::None {
                     debug!(
-                        "Unsupported message type {:?} (id {}",
-                        related_message_type, related_event_id
+                        "Ignoring emoji reaction, doesn't match any known emoji ({:?})",
+                        reaction_emoji
                     );
-                    None
+                    return;
                 }
+
+                let msg = match related_message_type {
+                    MessageType::Text(_) => {
+                        let msg = if let Some(news) = news_store.news_by_message_id(&related_event_id) {
+                            match reaction_type {
+                                ReactionType::Notification => {
+                                    // TODO tag as news
+                                    Some(String::new())
+                                }
+                                ReactionType::Approval => {
+                                    news.add_approval(reaction_event_id);
+                                    Some(format!(
+                                        "✅ Editor {} approved {}'s news entry. [{}]",
+                                        reaction_sender.user_id().to_string(),
+                                        news.reporter_id,
+                                        link
+                                    ))
+                                }
+                                ReactionType::Section(section) => {
+                                    let section = section.unwrap();
+                                    news.add_section_name(reaction_event_id, section.name);
+                                    Some(format!(
+                                        "✅ Editor {} added {}’s news entry [{}] to the “{}” section.",
+                                        reaction_sender.user_id().to_string(),
+                                        news.reporter_id,
+                                        link,
+                                        section.title
+                                    ))
+                                }
+                                ReactionType::Project(project) => {
+                                    let project = project.unwrap();
+                                    news.add_project_name(reaction_event_id, project.name);
+                                    Some(format!(
+                                        "✅ Editor {} added the project description “{}” to {}’s news entry [{}].",
+                                        reaction_sender.user_id().to_string(),
+                                        project.title,
+                                        news.reporter_id,
+                                        link
+                                    ))
+                                }
+                                ReactionType::Image => {
+                                    Some(format!(
+                                        "❌ It’s not possible to save {}’s news entry as image (only image messages are supported) [{}].",
+                                        news.reporter_id,
+                                        link
+                                    ))
+                                }
+                                ReactionType::Video => {
+                                    Some(format!(
+                                        "❌ It’s not possible to save {}’s news entry as video (only video messages are supported) [{}].",
+                                        news.reporter_id,
+                                        link
+                                    ))
+                                }
+                                _ => None,
+                            }
+                        } else {
+                            Some(format!(
+                                "❌ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
+                                reaction_sender.user_id().to_string(),
+                                reaction_type,
+                                link,
+                                related_event_id
+                            ))
+                        };
+                        msg
+                    }
+                    MessageType::Image(image) => match reaction_type {
+                        ReactionType::Image => {
+                            let reporter_id = reaction_sender.user_id().to_string();
+                            if let Some(news) = news_store.find_related_news(
+                                &related_event.sender().to_string(),
+                                &related_event_timestamp,
+                            ) {
+                                if let Some(mxc_uri) = &image.url {
+                                    news.add_image(
+                                        reaction_event_id,
+                                        image.body.clone(),
+                                        mxc_uri.clone(),
+                                    );
+                                    Some(format!(
+                                        "✅ Added image to {}’s news entry (“{}”) [{}].",
+                                        news.reporter_id,
+                                        news.message_summary(),
+                                        link
+                                    ))
+                                } else {
+                                    None
+                                }
+                            } else {
+                                Some(format!(
+                                    "❌ Unable to save {}’s image, no matching news entry found ({}).",
+                                    reporter_id, link
+                                ))
+                            }
+                        }
+                        _ => Some(format!(
+                            "❌ Invalid reaction emoji {} by {} for message type image [{}].",
+                            reaction_emoji,
+                            reaction_sender.user_id().to_string(),
+                            link
+                        )),
+                    },
+                    MessageType::Video(video) => match reaction_type {
+                        ReactionType::Video => {
+                            let reporter_id = reaction_sender.user_id().to_string();
+                            if let Some(news) = news_store.find_related_news(
+                                &related_event.sender().to_string(),
+                                &related_event_timestamp,
+                            ) {
+                                if let Some(mxc_uri) = &video.url {
+                                    news.add_video(
+                                        reaction_event_id,
+                                        video.body.clone(),
+                                        mxc_uri.clone(),
+                                    );
+                                    Some(format!(
+                                        "✅ Added video to {}’s news entry (“{}”) [{}].",
+                                        news.reporter_id,
+                                        news.message_summary(),
+                                        link
+                                    ))
+                                } else {
+                                    None
+                                }
+                            } else {
+                                Some(format!(
+                                    "❌ Unable to save {}’s video, no matching news entry found ({}).",
+                                    reporter_id, link
+                                ))
+                            }
+                        }
+                        _ => Some(format!(
+                            "❌ Invalid reaction emoji by {} for message type video [{}].",
+                            reaction_sender.user_id().to_string(),
+                            link
+                        )),
+                    },
+                    _ => {
+                        debug!(
+                            "Unsupported message type {:?} (id {}",
+                            related_message_type, related_event_id
+                        );
+                        None
+                    }
+                };
+                news_store.write_data();
+                msg
             };
-            news_store.write_data();
-            msg
-        };
+        }
 
         // Send confirm message to admin room
         if let Some(message) = message {
@@ -702,6 +733,7 @@ impl EventCallback {
             section.html_details()
         } else {
             match result_reaction {
+                ReactionType::Notification => format!("{} is configured as the notification emoji.", term),
                 ReactionType::Approval => format!("{} is configured as approval emoji.", term),
                 ReactionType::Section(section) => section.unwrap().html_details(),
                 ReactionType::Project(project) => project.unwrap().html_details(),

@@ -13,6 +13,7 @@ pub struct Config {
     pub bot_password: String,
     pub reporting_room_id: String,
     pub admin_room_id: String,
+    pub notification_emoji: String,
     pub approval_emoji: String,
     pub image_emoji: String,
     pub image_markdown: String,
@@ -64,7 +65,9 @@ impl Config {
     }
 
     pub fn reaction_type_by_emoji(&self, emoji: &str) -> ReactionType {
-        if utils::emoji_cmp(&self.approval_emoji, emoji) {
+        if utils::emoji_cmp(&self.notification_emoji, emoji) {
+            return ReactionType::Notification;
+        } else if utils::emoji_cmp(&self.approval_emoji, emoji) {
             return ReactionType::Approval;
         } else if utils::emoji_cmp(&self.image_emoji, emoji) {
             return ReactionType::Image;
