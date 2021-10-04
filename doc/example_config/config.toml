@@ -16,12 +16,14 @@ emoji = '🔵'
 name = 'core'
 title = 'Core Apps and Libraries'
 order = 100
+usual_reporters = ['@user1:domain.io']
 
 [[sections]]
 emoji = '🛰️'
 name = 'third-party'
 title = 'Third Party Projects'
 order = 100
+usual_reporters = []
 
 [[projects]]
 emoji = '📻'
@@ -30,6 +32,10 @@ title = 'Shortwave'
 description = 'Internet radio player with over 25000 stations.'
 website = 'https://gitlab.gnome.org/World/Shortwave'
 default_section = 'circle'
+usual_reporters = [
+    '@user1:domain.io',
+    '@user2:domain.com',
+]
 
 [[projects]]
 emoji = '⬇️'
@@ -38,3 +44,4 @@ title = 'Fragments'
 description = 'Easy to use BitTorrent client.'
 website = 'https://gitlab.gnome.org/World/Fragments'
 default_section = 'circle'
+usual_reporters = []
