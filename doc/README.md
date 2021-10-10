@@ -31,6 +31,9 @@ In order to use the bot, two configuration files are required. The `config.toml`
 
 For both configuration files, examples are available that can be used as templates (see `example_config` folder). 
 
+More configuration examples:
+- [This Week in GNOME](https://gitlab.gnome.org/World/twig/-/tree/main/hebbot)
+
 ### Deployment
 The bot is available as [docker image](https://hub.docker.com/r/haeckerfelix/hebbot).
 You can find an example `docker-compose.yml` inside the `example_config` folder.
