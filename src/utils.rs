@@ -1,3 +1,4 @@
+use async_process::{Command, Stdio};
 use matrix_sdk::room::Room;
 use matrix_sdk::BaseRoomMember;
 use regex::Regex;
@@ -122,4 +123,27 @@ pub fn format_messages(is_warning: bool, list: &[String]) -> String {
         messages += &format!("- {} {}<br>", emoji, message);
     }
     messages
+}
+
+pub async fn execute_command(launch: &str) -> Option<String> {
+    debug!("Executing command: {:?}", launch);
+
+    // Merge stdout/stderr
+    let launch = format!("{} 2>&1", launch);
+
+    let out = Command::new("sh")
+        .arg("-c")
+        .arg(launch)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .await
+        .ok()?;
+
+    let mut lines = String::new();
+    lines += &String::from_utf8(out.stdout).ok()?;
+    lines += &String::from_utf8(out.stderr).ok()?;
+
+    dbg!(&lines);
+    Some(lines)
 }

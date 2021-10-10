@@ -670,6 +670,7 @@ impl EventCallback {
             "!restart" => self.restart_command().await,
             "!say" => self.say_command(args).await,
             "!status" => self.status_command().await,
+            "!update-config" => self.update_config_command().await,
             _ => self.unrecognized_command().await,
         }
     }
@@ -685,7 +686,8 @@ impl EventCallback {
             !render \n\
             !restart \n\
             !say <message> \n\
-            !status";
+            !status \n\
+            !update-config";
 
         self.0
             .send_message(help, BotMsgType::AdminRoomPlainNotice)
@@ -905,6 +907,29 @@ impl EventCallback {
         self.0
             .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
             .await;
+    }
+
+    async fn update_config_command(&self) {
+        self.0
+            .send_message(
+                "Updating bot configuration…",
+                BotMsgType::AdminRoomHtmlNotice,
+            )
+            .await;
+
+        let command = self.0.config.update_config_command.clone();
+        let msg = match utils::execute_command(&command).await {
+            Some(stdout) => format!(
+                "✅ Updated bot configuration!<br><pre><code>{}</code></pre>",
+                stdout
+            ),
+            None => "❌ Unable to run update command. Check bot logs for more details.".to_string(),
+        };
+
+        self.0
+            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+            .await;
+        self.restart_command().await;
     }
 
     async fn unrecognized_command(&self) {

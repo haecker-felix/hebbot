@@ -6,6 +6,7 @@ image_emoji = '📷️'
 image_markdown = '> ![]({{file}})'
 video_emoji = '📹️'
 video_markdown = '> {{< video src="{{file}}" >}}'
+update_config_command = "sh ./update_config.sh"
 editors = [
     '@user1:domain.io',
     '@user2:domain.com',
