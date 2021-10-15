@@ -392,9 +392,11 @@ impl EventCallback {
         related_event: &AnyRoomEvent,
         related_message_type: &MessageType,
     ) {
-        // Check if the sender is a editor (= has the permission to use emoji "commands")
-        if !self.is_editor(reaction_sender).await
-            || reaction_sender.user_id().as_str() == self.0.config.bot_user_id
+        // Only allow editors to use general commands
+        // or the general public to use the notice emoji
+        let sender_is_editor = !self.is_editor(reaction_sender).await;
+        if reaction_sender.user_id().as_str() == self.0.config.bot_user_id
+            || (!sender_is_editor && !utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji))
         {
             return;
         }
@@ -468,6 +470,38 @@ impl EventCallback {
                                     news.reporter_id,
                                     link
                                 ))
+                            }
+                            ReactionType::Notice => {
+                                // Check if the news already exists
+                                if let Some(news) = news_store.news_by_message_id(&related_event_id) {
+                                    Some(format!("❌ News reported by {} already exists and cannot be re-reported [{}]",
+                                        news.reporter_id,
+                                        link
+                                    ))
+                                } else {
+                                    // If it doesn't, add it and say it has been added.
+                                    panic!("FIX THE TODO");
+                                    // TODO fetch related event's
+                                    // * event_id
+                                    // * reporter_id
+                                    // * reporter_display_name
+                                    // * message
+                                    let related_event_reporter_id = "".to_owned();
+                                    let related_event_reporter_display_name = "".to_owned();
+                                    let related_event_message = "".to_owned();
+                                    let news = News::new(
+                                        related_event.event_id().clone().to_string(),
+                                        related_event_reporter_id,
+                                        related_event_reporter_display_name,
+                                        related_event_message,
+                                    );
+
+                                    self.0.news_store.lock().unwrap().add_news(news.clone());
+
+                                    Some(format!("✅ {} submitted a news entry. [{}]",
+                                        news.reporter_id,
+                                        link))
+                                }
                             }
                             _ => None,
                         }
@@ -739,6 +773,7 @@ impl EventCallback {
                 ReactionType::Image => format!("{} is configured as image emoji.", term),
                 ReactionType::Video => format!("{} is configured as video emoji.", term),
                 ReactionType::None => format!("❌ Unable to find details for ”{}”.", term),
+                ReactionType::Notice => format!("{} is configured as a notice emoji", term),
             }
         };
 

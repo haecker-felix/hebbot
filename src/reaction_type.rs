@@ -10,6 +10,7 @@ pub enum ReactionType {
     Image,
     Video,
     None,
+    Notice,
 }
 
 impl fmt::Display for ReactionType {
@@ -21,6 +22,7 @@ impl fmt::Display for ReactionType {
             ReactionType::Image => write!(f, "image"),
             ReactionType::Video => write!(f, "video"),
             ReactionType::None => write!(f, "NONE"),
+            ReactionType::Notice => write!(f, "notice"),
         }
     }
 }

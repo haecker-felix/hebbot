@@ -13,6 +13,7 @@ pub struct Config {
     pub reporting_room_id: String,
     pub admin_room_id: String,
     pub approval_emoji: String,
+    pub notice_emoji: String,
     pub image_emoji: String,
     pub image_markdown: String,
     pub video_emoji: String,
