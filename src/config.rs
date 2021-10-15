@@ -73,6 +73,8 @@ impl Config {
             return ReactionType::Image;
         } else if utils::emoji_cmp(&self.video_emoji, emoji) {
             return ReactionType::Video;
+        } else if utils::emoji_cmp(&self.notice_emoji, emoji){
+            return ReactionType::Notice;
         } else {
             // section
             for section in &self.sections {

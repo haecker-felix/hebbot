@@ -394,7 +394,7 @@ impl EventCallback {
     ) {
         // Only allow editors to use general commands
         // or the general public to use the notice emoji
-        let sender_is_editor = !self.is_editor(reaction_sender).await;
+        let sender_is_editor = self.is_editor(reaction_sender).await;
         if reaction_sender.user_id().as_str() == self.0.config.bot_user_id
             || (!sender_is_editor && !utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji))
         {
@@ -472,47 +472,43 @@ impl EventCallback {
                                 ))
                             }
                             ReactionType::Notice => {
-                                // Check if the news already exists
-                                if let Some(news) = news_store.news_by_message_id(&related_event_id) {
-                                    Some(format!("❌ News reported by {} already exists and cannot be re-reported [{}]",
-                                        news.reporter_id,
-                                        link
-                                    ))
-                                } else {
-                                    // If it doesn't, add it and say it has been added.
-                                    panic!("FIX THE TODO");
-                                    // TODO fetch related event's
-                                    // * event_id
-                                    // * reporter_id
-                                    // * reporter_display_name
-                                    // * message
-                                    let related_event_reporter_id = "".to_owned();
-                                    let related_event_reporter_display_name = "".to_owned();
-                                    let related_event_message = "".to_owned();
-                                    let news = News::new(
-                                        related_event.event_id().clone().to_string(),
-                                        related_event_reporter_id,
-                                        related_event_reporter_display_name,
-                                        related_event_message,
-                                    );
-
-                                    self.0.news_store.lock().unwrap().add_news(news.clone());
-
-                                    Some(format!("✅ {} submitted a news entry. [{}]",
-                                        news.reporter_id,
-                                        link))
-                                }
+                                // Tagging an event that was already a news, do nothing
+                                None
                             }
                             _ => None,
                         }
                     } else {
-                        Some(format!(
-                            "❌ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
-                            reaction_sender.user_id().to_string(),
-                            reaction_type,
-                            link,
-                            related_event_id
-                        ))
+                        if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
+                            // TODO fetch related event's
+                            // * event_id
+                            // * reporter_id
+                            // * reporter_display_name
+                            // * message
+                            panic!("Fix the TODO!");
+                            let related_event_reporter_id = "".to_owned();
+                            let related_event_reporter_display_name = "".to_owned();
+                            let related_event_message = "".to_owned();
+                            let news = News::new(
+                                related_event.event_id().clone().to_string(),
+                                related_event_reporter_id.clone(),
+                                related_event_reporter_display_name,
+                                related_event_message,
+                            );
+
+                            self.0.news_store.lock().unwrap().add_news(news);
+
+                            Some(format!("✅ {} submitted a news entry. [{}]",
+                                related_event_reporter_id,
+                                link))
+                        } else {
+                            Some(format!(
+                                "❌ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
+                                reaction_sender.user_id().to_string(),
+                                reaction_type,
+                                link,
+                                related_event_id
+                            ))
+                        }
                     };
                     msg
                 }
