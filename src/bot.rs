@@ -402,7 +402,7 @@ impl EventCallback {
         }
 
         let message: Option<String> = {
-            let news_store = self.0.news_store.lock().unwrap();
+            let mut news_store = self.0.news_store.lock().unwrap();
 
             let reaction_event_id = reaction_event_id.to_string();
             let reaction_type = self.0.config.reaction_type_by_emoji(reaction_emoji);
@@ -495,7 +495,7 @@ impl EventCallback {
                                 related_event_message,
                             );
 
-                            self.0.news_store.lock().unwrap().add_news(news);
+                            news_store.add_news(news);
 
                             Some(format!("✅ {} submitted a news entry. [{}]",
                                 related_event_reporter_id,
