@@ -773,7 +773,7 @@ impl EventCallback {
                 ReactionType::Image => format!("{} is configured as image emoji.", term),
                 ReactionType::Video => format!("{} is configured as video emoji.", term),
                 ReactionType::None => format!("❌ Unable to find details for ”{}”.", term),
-                ReactionType::Notice => format!("{} is configured as a notice emoji", term),
+                ReactionType::Notice => format!("{} is configured as notice emoji", term),
             }
         };
 
