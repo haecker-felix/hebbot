@@ -2,11 +2,12 @@ use chrono::{DateTime, Utc};
 use matrix_sdk::room::{Joined, Room};
 use matrix_sdk::uuid::Uuid;
 use matrix_sdk::{Client, EventHandler, RoomMember, SyncSettings};
-use ruma::events::reaction::{ReactionEventContent, Relation};
-use ruma::events::room::message::{FileMessageEventContent, MessageEventContent, MessageType};
-use ruma::events::room::redaction::SyncRedactionEvent;
-use ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
-use ruma::{EventId, MxcUri, RoomId, UserId};
+use matrix_sdk::ruma::events::reaction::{ReactionEventContent, Relation};
+use matrix_sdk::ruma::events::room::message::{FileMessageEventContent, MessageEventContent, MessageType};
+use matrix_sdk::ruma::events::room::redaction::SyncRedactionEvent;
+use matrix_sdk::ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
+use matrix_sdk::ruma::{EventId, MxcUri, RoomId, UserId};
+use matrix_sdk::ruma::events::AnyMessageEvent;
 
 use std::convert::TryFrom;
 use std::env;
@@ -479,27 +480,34 @@ impl EventCallback {
                         }
                     } else {
                         if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
-                            // TODO fetch related event's
+                            // Fetch related event's
                             // * event_id
                             // * reporter_id
                             // * reporter_display_name
                             // * message
-                            panic!("Fix the TODO!");
-                            let related_event_reporter_id = "".to_owned();
-                            let related_event_reporter_display_name = "".to_owned();
-                            let related_event_message = "".to_owned();
-                            let news = News::new(
-                                related_event.event_id().clone().to_string(),
-                                related_event_reporter_id.clone(),
-                                related_event_reporter_display_name,
-                                related_event_message,
-                            );
+                            // FIXME this code is atrocious, make it more idiomatic
+                            if let AnyRoomEvent::Message(message_event) = related_event {
+                                if let AnyMessageEvent::RoomMessage(m) = message_event {
+                                    if let MessageType::Text(c) = &m.content.msgtype {
+                                        let related_event_reporter_id = m.sender.to_string();
+                                        let related_event_reporter_display_name = m.sender.to_string(); // TODO get actual display name
+                                        let related_event_message = c.body.clone(); // FIXME body, or formated if it exists?
 
-                            news_store.add_news(news);
+                                        let news = News::new(
+                                            related_event.event_id().clone().to_string(),
+                                            related_event_reporter_id.clone(),
+                                            related_event_reporter_display_name,
+                                            related_event_message,
+                                        );
 
-                            Some(format!("✅ {} submitted a news entry. [{}]",
-                                related_event_reporter_id,
-                                link))
+                                        news_store.add_news(news);
+
+                                        Some(format!("✅ {} submitted a news entry. [{}]",
+                                            related_event_reporter_id,
+                                            link))
+                                    } else { None }
+                                } else { None }
+                            } else { None }
                         } else {
                             Some(format!(
                                 "❌ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
