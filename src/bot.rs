@@ -472,10 +472,6 @@ impl EventCallback {
                                     link
                                 ))
                             }
-                            ReactionType::Notice => {
-                                // Tagging an event that was already a news, do nothing
-                                None
-                            }
                             _ => None,
                         }
                     } else if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
