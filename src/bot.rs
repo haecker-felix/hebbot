@@ -477,7 +477,7 @@ impl EventCallback {
                         }
                     } else if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
                         // The related message is not a known news submission, check if it got reacted by the notice emoji
-                            
+
                         // Fetch related event's
                         // * event_id
                         // * reporter_id
@@ -491,7 +491,8 @@ impl EventCallback {
                                 },
                             sender,
                             ..
-                        })) = related_event {
+                        })) = related_event
+                        {
                             let related_event_reporter_id = sender.to_string();
                             let related_event_reporter_display_name = sender.to_string(); // TODO get actual display name
                             let related_event_message = c.body.clone();
