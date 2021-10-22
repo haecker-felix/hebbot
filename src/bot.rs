@@ -1,14 +1,16 @@
 use chrono::{DateTime, Utc};
 use matrix_sdk::room::{Joined, Room};
-use matrix_sdk::uuid::Uuid;
-use matrix_sdk::{Client, EventHandler, RoomMember, SyncSettings};
 use matrix_sdk::ruma::events::reaction::{ReactionEventContent, Relation};
-use matrix_sdk::ruma::events::room::message::{FileMessageEventContent, MessageEventContent, MessageType};
+use matrix_sdk::ruma::events::room::message::{
+    FileMessageEventContent, MessageEventContent, MessageType,
+};
 use matrix_sdk::ruma::events::room::redaction::SyncRedactionEvent;
-use matrix_sdk::ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
-use matrix_sdk::ruma::{EventId, MxcUri, RoomId, UserId};
 use matrix_sdk::ruma::events::AnyMessageEvent;
 use matrix_sdk::ruma::events::MessageEvent;
+use matrix_sdk::ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
+use matrix_sdk::ruma::{EventId, MxcUri, RoomId, UserId};
+use matrix_sdk::uuid::Uuid;
+use matrix_sdk::{Client, EventHandler, RoomMember, SyncSettings};
 
 use std::convert::TryFrom;
 use std::env;
