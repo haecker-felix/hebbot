@@ -483,10 +483,18 @@ impl EventCallback {
                         // * reporter_id
                         // * reporter_display_name
                         // * message
-                        if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(MessageEvent { content: MessageEventContent { msgtype: MessageType::Text(c),.. }, sender, ..})) = related_event {
+                        if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(MessageEvent {
+                            content:
+                                MessageEventContent {
+                                    msgtype: MessageType::Text(c),
+                                    ..
+                                },
+                            sender,
+                            ..
+                        })) = related_event {
                             let related_event_reporter_id = sender.to_string();
                             let related_event_reporter_display_name = sender.to_string(); // TODO get actual display name
-                            let related_event_message = c.body.clone(); // FIXME body, or formated if it exists?
+                            let related_event_message = c.body.clone();
 
                             let news = News::new(
                                 related_event.event_id().clone().to_string(),
@@ -497,10 +505,13 @@ impl EventCallback {
 
                             news_store.add_news(news);
 
-                            Some(format!("✅ {} submitted a news entry. [{}]",
-                                related_event_reporter_id,
-                                link))
-                        } else { None }
+                            Some(format!(
+                                "✅ {} submitted a news entry. [{}]",
+                                related_event_reporter_id, link
+                            ))
+                        } else {
+                            None
+                        }
                     } else {
                         Some(format!(
                             "❌ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
