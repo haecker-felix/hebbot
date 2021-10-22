@@ -8,6 +8,7 @@ use matrix_sdk::ruma::events::room::redaction::SyncRedactionEvent;
 use matrix_sdk::ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
 use matrix_sdk::ruma::{EventId, MxcUri, RoomId, UserId};
 use matrix_sdk::ruma::events::AnyMessageEvent;
+use matrix_sdk::ruma::events::MessageEvent;
 
 use std::convert::TryFrom;
 use std::env;
@@ -482,26 +483,23 @@ impl EventCallback {
                         // * reporter_id
                         // * reporter_display_name
                         // * message
-                        // FIXME this code is atrocious, make it more idiomatic
-                        if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(m)) = related_event {
-                            if let MessageType::Text(c) = &m.content.msgtype {
-                                let related_event_reporter_id = m.sender.to_string();
-                                let related_event_reporter_display_name = m.sender.to_string(); // TODO get actual display name
-                                let related_event_message = c.body.clone(); // FIXME body, or formated if it exists?
+                        if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(MessageEvent { content: MessageEventContent { msgtype: MessageType::Text(c),.. }, sender, ..})) = related_event {
+                            let related_event_reporter_id = sender.to_string();
+                            let related_event_reporter_display_name = sender.to_string(); // TODO get actual display name
+                            let related_event_message = c.body.clone(); // FIXME body, or formated if it exists?
 
-                                let news = News::new(
-                                    related_event.event_id().clone().to_string(),
-                                    related_event_reporter_id.clone(),
-                                    related_event_reporter_display_name,
-                                    related_event_message,
-                                );
+                            let news = News::new(
+                                related_event.event_id().clone().to_string(),
+                                related_event_reporter_id.clone(),
+                                related_event_reporter_display_name,
+                                related_event_message,
+                            );
 
-                                news_store.add_news(news);
+                            news_store.add_news(news);
 
-                                Some(format!("✅ {} submitted a news entry. [{}]",
-                                    related_event_reporter_id,
-                                    link))
-                            } else { None }
+                            Some(format!("✅ {} submitted a news entry. [{}]",
+                                related_event_reporter_id,
+                                link))
                         } else { None }
                     } else {
                         Some(format!(
