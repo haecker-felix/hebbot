@@ -13,6 +13,7 @@ pub struct Config {
     pub reporting_room_id: String,
     pub admin_room_id: String,
     pub approval_emoji: String,
+    pub notice_emoji: String,
     pub image_emoji: String,
     pub image_markdown: String,
     pub video_emoji: String,
@@ -72,6 +73,8 @@ impl Config {
             return ReactionType::Image;
         } else if utils::emoji_cmp(&self.video_emoji, emoji) {
             return ReactionType::Video;
+        } else if utils::emoji_cmp(&self.notice_emoji, emoji) {
+            return ReactionType::Notice;
         } else {
             // section
             for section in &self.sections {
