@@ -5,8 +5,6 @@ use matrix_sdk::ruma::events::room::message::{
     FileMessageEventContent, MessageEventContent, MessageType,
 };
 use matrix_sdk::ruma::events::room::redaction::SyncRedactionEvent;
-use matrix_sdk::ruma::events::AnyMessageEvent;
-use matrix_sdk::ruma::events::MessageEvent;
 use matrix_sdk::ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
 use matrix_sdk::ruma::{EventId, MxcUri, RoomId, UserId};
 use matrix_sdk::uuid::Uuid;
@@ -477,42 +475,16 @@ impl EventCallback {
                             }
                             _ => None,
                         }
+                    // The related message is not a known news submission, check if it got reacted by the notice emoji
                     } else if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
-                        // The related message is not a known news submission, check if it got reacted by the notice emoji
-
-                        // Fetch related event's
-                        // * event_id
-                        // * reporter_id
-                        // * reporter_display_name
-                        // * message
-                        if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(MessageEvent {
-                            content:
-                                MessageEventContent {
-                                    msgtype: MessageType::Text(c),
-                                    ..
-                                },
-                            sender,
-                            ..
-                        })) = related_event
-                        {
-                            let related_event_reporter_id = sender.to_string();
-                            let related_event_reporter_display_name = sender.to_string(); // TODO get actual display name
-                            let related_event_message = c.body.clone();
-
-                            let news = News::new(
-                                related_event.event_id().clone().to_string(),
-                                related_event_reporter_id.clone(),
-                                related_event_reporter_display_name,
-                                related_event_message,
-                            );
-
-                            news_store.add_news(news);
-
+                        if let Some(news) = utils::news_by_event(&related_event, &reaction_sender) {
+                            news_store.add_news(news.clone());
                             Some(format!(
                                 "✅ {} submitted a news entry. [{}]",
-                                related_event_reporter_id, link
+                                news.reporter_display_name, link
                             ))
                         } else {
+                            warn!("Event is not a MessageEvent, can't add it as news");
                             None
                         }
                     } else {

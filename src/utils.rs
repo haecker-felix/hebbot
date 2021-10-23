@@ -1,6 +1,6 @@
 use async_process::{Command, Stdio};
 use matrix_sdk::room::Room;
-use matrix_sdk::BaseRoomMember;
+use matrix_sdk::{BaseRoomMember, RoomMember};
 use regex::Regex;
 use ruma::api::client::r0::room::get_room_event::Request;
 use ruma::events::room::message::{
@@ -8,6 +8,42 @@ use ruma::events::room::message::{
 };
 use ruma::events::{AnyMessageEvent, AnyRoomEvent, MessageEvent, SyncMessageEvent};
 use ruma::{EventId, UserId};
+
+use crate::News;
+
+/// Try to convert a `AnyRoomEvent` into a `News`
+pub fn news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) -> Option<News> {
+    // Fetch related event's
+    // * event_id
+    // * reporter_id
+    // * reporter_display_name
+    // * message
+    if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(MessageEvent {
+        content:
+            MessageEventContent {
+                msgtype: MessageType::Text(c),
+                ..
+            },
+        sender,
+        ..
+    })) = any_room_event
+    {
+        let reporter_id = sender.to_string();
+        let reporter_display_name = get_member_display_name(&member);
+        let message = c.body.clone();
+
+        let news = News::new(
+            any_room_event.event_id().clone().to_string(),
+            reporter_id.clone(),
+            reporter_display_name,
+            message,
+        );
+
+        return Some(news);
+    }
+
+    None
+}
 
 /// Get room message by event id
 pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyRoomEvent> {
