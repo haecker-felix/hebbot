@@ -29,12 +29,12 @@ pub fn news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) -> Opti
     })) = any_room_event
     {
         let reporter_id = sender.to_string();
-        let reporter_display_name = get_member_display_name(&member);
+        let reporter_display_name = get_member_display_name(member);
         let message = c.body.clone();
 
         let news = News::new(
             any_room_event.event_id().clone().to_string(),
-            reporter_id.clone(),
+            reporter_id,
             reporter_display_name,
             message,
         );

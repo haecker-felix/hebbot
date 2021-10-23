@@ -441,7 +441,7 @@ impl EventCallback {
                         }
                     // The related message is not a known news submission, check if it got reacted by the notice emoji
                     } else if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
-                        if let Some(news) = utils::news_by_event(&related_event, &reaction_sender) {
+                        if let Some(news) = utils::news_by_event(related_event, reaction_sender) {
                             self.add_news(news, false).await;
                             None
                         } else {
