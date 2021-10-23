@@ -72,7 +72,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
             continue;
         }
 
-        // The news entry is asigned to a project / section, and will be rendered -> increase counter.
+        // The news entry is assigned to a project / section, and will be rendered -> increase counter.
         news_count += 1;
 
         // Get news images / videos
