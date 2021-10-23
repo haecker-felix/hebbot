@@ -291,54 +291,15 @@ impl EventCallback {
 
         let reporter_id = member.user_id().to_string();
         let reporter_display_name = utils::get_member_display_name(member);
-        let bot = self.0.client.user_id().await.unwrap();
 
-        // Check min message length
-        if message.len() > 30 {
-            let msg = format!(
-                "✅ Thanks for the report {}, I'll store your update!",
-                reporter_display_name
-            );
-            self.0
-                .send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
-                .await;
-
-            let link = self.message_link(event_id.to_string());
-            let msg = format!("✅ {} submitted a news entry. [{}]", member.user_id(), link);
-            self.0
-                .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
-                .await;
-
-            // remove bot name from message
-            let message = utils::remove_bot_name(&message, &bot);
-
-            // Create new news entry...
-            let news = News::new(
-                event_id.clone().to_string(),
-                reporter_id.clone(),
-                reporter_display_name,
-                message,
-            );
-
-            // ...and save it for the next report!
-            self.0.news_store.lock().unwrap().add_news(news);
-
-            // Pre-populate with emojis to facilitate the editor's work
-            for project in self.0.config.projects_by_usual_reporter(&reporter_id) {
-                self.0.send_reaction(&project.emoji, event_id).await;
-            }
-            for section in self.0.config.sections_by_usual_reporter(&reporter_id) {
-                self.0.send_reaction(&section.emoji, event_id).await;
-            }
-        } else {
-            let msg = format!(
-                "❌ {}: Your update is too short and was not stored. This limitation was set-up to limit spam.",
-                reporter_display_name
-            );
-            self.0
-                .send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
-                .await;
-        }
+        // Create new news entry...
+        let news = News::new(
+            event_id.clone().to_string(),
+            reporter_id.clone(),
+            reporter_display_name,
+            message,
+        );
+        self.add_news(news, true).await;
     }
 
     /// New message in reporting room
@@ -404,8 +365,6 @@ impl EventCallback {
         }
 
         let message: Option<String> = {
-            let mut news_store = self.0.news_store.lock().unwrap();
-
             let reaction_event_id = reaction_event_id.to_string();
             let reaction_type = self.0.config.reaction_type_by_emoji(reaction_emoji);
             let related_event_id = related_event.event_id().to_string();
@@ -426,7 +385,12 @@ impl EventCallback {
 
             let msg = match related_message_type {
                 MessageType::Text(_) => {
-                    let msg = if let Some(news) = news_store.news_by_message_id(&related_event_id) {
+                    let news = {
+                        let news_store = self.0.news_store.lock().unwrap();
+                        news_store.news_by_message_id(&related_event_id).cloned()
+                    };
+
+                    let msg = if let Some(news) = news {
                         match reaction_type {
                             ReactionType::Approval => {
                                 news.add_approval(reaction_event_id);
@@ -478,14 +442,14 @@ impl EventCallback {
                     // The related message is not a known news submission, check if it got reacted by the notice emoji
                     } else if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
                         if let Some(news) = utils::news_by_event(&related_event, &reaction_sender) {
-                            news_store.add_news(news.clone());
-                            Some(format!(
-                                "✅ {} submitted a news entry. [{}]",
-                                news.reporter_display_name, link
-                            ))
-                        } else {
-                            warn!("Event is not a MessageEvent, can't add it as news");
+                            self.add_news(news, false).await;
                             None
+                        } else {
+                            Some(format!(
+                            "❌ Unable to add {}’s message as news, invalid event/message type [{}]",
+                            related_event.sender().to_string(),
+                            link,
+                        ))
                         }
                     } else {
                         Some(format!(
@@ -501,6 +465,7 @@ impl EventCallback {
                 MessageType::Image(image) => match reaction_type {
                     ReactionType::Image => {
                         let reporter_id = reaction_sender.user_id().to_string();
+                        let news_store = self.0.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
                             &related_event.sender().to_string(),
                             &related_event_timestamp,
@@ -537,6 +502,7 @@ impl EventCallback {
                 MessageType::Video(video) => match reaction_type {
                     ReactionType::Video => {
                         let reporter_id = reaction_sender.user_id().to_string();
+                        let news_store = self.0.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
                             &related_event.sender().to_string(),
                             &related_event_timestamp,
@@ -577,6 +543,8 @@ impl EventCallback {
                     None
                 }
             };
+
+            let news_store = self.0.news_store.lock().unwrap();
             news_store.write_data();
             msg
         };
@@ -954,6 +922,60 @@ impl EventCallback {
         self.0
             .send_message(msg, BotMsgType::AdminRoomPlainNotice)
             .await;
+    }
+
+    async fn add_news(&self, news: News, notify_reporter: bool) {
+        // Check min message length
+        if news.message().len() > 30 {
+            if notify_reporter {
+                let msg = format!(
+                    "✅ Thanks for the report {}, I'll store your update!",
+                    news.reporter_display_name
+                );
+                self.0
+                    .send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
+                    .await;
+            }
+
+            let link = self.message_link(news.event_id.to_string());
+            let msg = format!("✅ {} submitted a news entry. [{}]", news.reporter_id, link);
+            self.0
+                .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+                .await;
+
+            // remove bot name from message
+            let bot_id = self.0.client.user_id().await.unwrap();
+            news.set_message(utils::remove_bot_name(&news.message(), &bot_id));
+
+            // Pre-populate with emojis to facilitate the editor's work
+            for project in self.0.config.projects_by_usual_reporter(&news.reporter_id) {
+                self.0
+                    .send_reaction(
+                        &project.emoji,
+                        &EventId::try_from(news.event_id.as_str()).unwrap(),
+                    )
+                    .await;
+            }
+            for section in self.0.config.sections_by_usual_reporter(&news.reporter_id) {
+                self.0
+                    .send_reaction(
+                        &section.emoji,
+                        &EventId::try_from(news.event_id.as_str()).unwrap(),
+                    )
+                    .await;
+            }
+
+            // Save it in message store
+            self.0.news_store.lock().unwrap().add_news(news);
+        } else {
+            let msg = format!(
+                "❌ {}: Your update is too short and was not stored. This limitation was set-up to limit spam.",
+                news.reporter_display_name
+            );
+            self.0
+                .send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
+                .await;
+        }
     }
 
     async fn is_editor(&self, member: &RoomMember) -> bool {
