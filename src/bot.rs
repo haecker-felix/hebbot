@@ -319,9 +319,9 @@ impl EventCallback {
             let news_store = self.0.news_store.lock().unwrap();
             let msg = if let Some(news) = news_store.news_by_message_id(&event_id) {
                 news.set_message(updated_message);
-                if news.is_approved() {
+                if news.is_assigned() {
                     Some(format!(
-                        "✅ The news entry by {} got edited ({}). Check the new text, and make sure you want to keep the approval.",
+                        "✅ The news entry by {} got edited ({}). Check the new text, and make sure you want to keep the assigned project/section.",
                         news.reporter_id,
                         link
                     ))
@@ -344,7 +344,6 @@ impl EventCallback {
 
     /// New emoji reaction in reporting room
     /// - Only reactions from editors are processed
-    /// - "approval emoji" -> approve a news entry
     /// - "section emoji" -> add a news entry to a section (eg. "Interesting Projects")
     /// - "project emoji" -> add a project description to a news entry
     async fn on_reporting_room_reaction(
@@ -385,22 +384,30 @@ impl EventCallback {
 
             let msg = match related_message_type {
                 MessageType::Text(_) => {
-                    let news = {
-                        let news_store = self.0.news_store.lock().unwrap();
-                        news_store.news_by_message_id(&related_event_id).cloned()
-                    };
+                    // Check if the reaction == notice emoji,
+                    // Yes -> Try to add the message as news submission
+                    let msg = if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
+                        if let Some(news) = utils::news_by_event(related_event, reaction_sender) {
+                            self.add_news(news, false).await;
+                            None
+                        } else {
+                            Some(format!(
+                                "❌ Unable to add {}’s message as news, invalid event/message type [{}]",
+                                related_event.sender().to_string(),
+                                link,
+                            ))
+                        }
 
-                    let msg = if let Some(news) = news {
+                    // Check if related message is a news entry
+                    // (Adding the entry to a project / section by using the corresponding reaction emoji)
+                    } else if let Some(news) = self
+                        .0
+                        .news_store
+                        .lock()
+                        .unwrap()
+                        .news_by_message_id(&related_event_id)
+                    {
                         match reaction_type {
-                            ReactionType::Approval => {
-                                news.add_approval(reaction_event_id);
-                                Some(format!(
-                                    "✅ Editor {} approved {}'s news entry. [{}]",
-                                    reaction_sender.user_id().to_string(),
-                                    news.reporter_id,
-                                    link
-                                ))
-                            }
                             ReactionType::Section(section) => {
                                 let section = section.unwrap();
                                 news.add_section_name(reaction_event_id, section.name);
@@ -439,18 +446,6 @@ impl EventCallback {
                             }
                             _ => None,
                         }
-                    // The related message is not a known news submission, check if it got reacted by the notice emoji
-                    } else if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
-                        if let Some(news) = utils::news_by_event(related_event, reaction_sender) {
-                            self.add_news(news, false).await;
-                            None
-                        } else {
-                            Some(format!(
-                            "❌ Unable to add {}’s message as news, invalid event/message type [{}]",
-                            related_event.sender().to_string(),
-                            link,
-                        ))
-                        }
                     } else {
                         Some(format!(
                             "❌ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
@@ -462,6 +457,8 @@ impl EventCallback {
                     };
                     msg
                 }
+
+                // Check if related message is an image
                 MessageType::Image(image) => match reaction_type {
                     ReactionType::Image => {
                         let reporter_id = reaction_sender.user_id().to_string();
@@ -499,6 +496,8 @@ impl EventCallback {
                         link
                     )),
                 },
+
+                // Check if related message is a video
                 MessageType::Video(video) => match reaction_type {
                     ReactionType::Video => {
                         let reporter_id = reaction_sender.user_id().to_string();
@@ -543,9 +542,6 @@ impl EventCallback {
                     None
                 }
             };
-
-            let news_store = self.0.news_store.lock().unwrap();
-            news_store.write_data();
             msg
         };
 
@@ -555,10 +551,14 @@ impl EventCallback {
                 .send_message(&message, BotMsgType::AdminRoomHtmlNotice)
                 .await;
         }
+
+        // Update stored news
+        let news_store = self.0.news_store.lock().unwrap();
+        news_store.write_data();
     }
 
     /// Something got redacted in reporting room
-    /// - Undo any reaction emoji "command" (eg. unapproving a news entry)
+    /// - Undo any reaction emoji "command" (eg. removing a news entry from a section)
     /// - Or a message itself got deleted / redacted
     async fn on_reporting_room_redaction(&self, member: &RoomMember, redacted_event_id: &EventId) {
         let message = {
@@ -577,7 +577,7 @@ impl EventCallback {
             // For all other redactions, there is no point in checking them if the member is not an editor.
             } else if !is_editor {
                 None
-            // Redaction of reaction events (approval, project, section)
+            // Redaction of reaction events (project / section)
             } else if let Some(news) = news_store.news_by_reaction_id(&redacted_event_id.clone()) {
                 let reaction_type = news.remove_reaction_id(&redacted_event_id);
                 if reaction_type != ReactionType::None {
@@ -717,7 +717,6 @@ impl EventCallback {
             section.html_details()
         } else {
             match result_reaction {
-                ReactionType::Approval => format!("{} is configured as approval emoji.", term),
                 ReactionType::Section(section) => section.unwrap().html_details(),
                 ReactionType::Project(project) => project.unwrap().html_details(),
                 ReactionType::Image => format!("{} is configured as image emoji.", term),
@@ -862,30 +861,30 @@ impl EventCallback {
             let news_store = self.0.news_store.lock().unwrap();
             let news = news_store.news();
 
-            let mut approved_count = 0;
-            let mut unapproved_count = 0;
+            let mut assigned_count = 0;
+            let mut unassigned_count = 0;
             let sum = news.len();
-            let mut approved_list = String::new();
-            let mut unapproved_list = String::new();
+            let mut assigned_list = String::new();
+            let mut unassigned_list = String::new();
 
             for n in &news {
                 let link = self.message_link(n.event_id.clone());
                 let summary = n.message_summary();
 
-                if n.is_approved() {
-                    approved_count += 1;
-                    approved_list += &format!("- [{}] {}: {} <br>", link, n.reporter_id, summary);
+                if n.is_assigned() {
+                    assigned_count += 1;
+                    assigned_list += &format!("- [{}] {}: {} <br>", link, n.reporter_id, summary);
                 } else {
-                    unapproved_count += 1;
-                    unapproved_list += &format!("- [{}] {}: {} <br>", link, n.reporter_id, summary);
+                    unassigned_count += 1;
+                    unassigned_list += &format!("- [{}] {}: {} <br>", link, n.reporter_id, summary);
                 }
             }
 
             format!(
                 "{} news entries in total <br><br>\
-                ✅ Approved news entries ({}): <br>{} <br>\
-                ❌ Unapproved news entries ({}): <br>{}",
-                sum, approved_count, approved_list, unapproved_count, unapproved_list
+                ✅ Assigned news entries: ({}): <br>{} <br>\
+                ❌ Unassigned / ignored news entries ({}): <br>{}",
+                sum, assigned_count, assigned_list, unassigned_count, unassigned_list
             )
         };
 

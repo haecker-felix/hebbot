@@ -41,7 +41,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     let mut render_sections: BTreeMap<String, RenderSection> = BTreeMap::new();
 
     let mut news_count = 0;
-    let mut not_approved = 0;
+    let mut not_assigned = 0;
     let mut report_text = String::new();
     let mut project_names: HashSet<String> = HashSet::new();
 
@@ -55,9 +55,9 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     for news in news_list {
         let message_link = message_link(&config, &news.event_id);
 
-        // Skip news entries which are not approved
-        if !news.is_approved() {
-            not_approved += 1;
+        // Skip news entries which are not assigned
+        if !news.is_assigned() {
+            not_assigned += 1;
             continue;
         }
 
@@ -72,7 +72,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
             continue;
         }
 
-        // The news entry is approved, and will be rendered -> increase counter.
+        // The news entry is asigned to a project / section, and will be rendered -> increase counter.
         news_count += 1;
 
         // Get news images / videos
@@ -216,10 +216,10 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     }
 
     // Create summary notes
-    if not_approved != 0 {
+    if not_assigned != 0 {
         let note = format!(
-            "{} news are not included because of missing approval. Use !status command to list them.",
-            not_approved
+            "{} news are not included because of project/section assignment is missing. Use !status command to list them.",
+            not_assigned
         );
         notes.insert(0, note);
     }

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::ReactionType;
 
@@ -15,7 +15,6 @@ pub struct News {
     pub reporter_display_name: String,
     pub timestamp: DateTime<Utc>,
     message: RefCell<String>,
-    approvals: RefCell<HashSet<String>>,
     section_names: RefCell<HashMap<String, String>>,
     project_names: RefCell<HashMap<String, String>>,
     images: RefCell<HashMap<String, (String, MxcUri)>>,
@@ -35,7 +34,6 @@ impl News {
             reporter_display_name,
             timestamp: chrono::Utc::now(),
             message: RefCell::new(message),
-            approvals: RefCell::default(),
             section_names: RefCell::default(),
             project_names: RefCell::default(),
             images: RefCell::default(),
@@ -59,12 +57,8 @@ impl News {
         *self.message.borrow_mut() = message;
     }
 
-    pub fn is_approved(&self) -> bool {
-        !self.approvals.borrow().is_empty()
-    }
-
-    pub fn add_approval(&self, event_id: String) {
-        self.approvals.borrow_mut().insert(event_id);
+    pub fn is_assigned(&self) -> bool {
+        !self.project_names.borrow().is_empty() || !self.section_names.borrow().is_empty()
     }
 
     pub fn section_names(&self) -> Vec<String> {
@@ -134,9 +128,7 @@ impl News {
     }
 
     pub fn remove_reaction_id(&self, event_id: &str) -> ReactionType {
-        if self.approvals.borrow_mut().remove(event_id) {
-            ReactionType::Approval
-        } else if self.section_names.borrow_mut().remove(event_id).is_some() {
+        if self.section_names.borrow_mut().remove(event_id).is_some() {
             ReactionType::Section(None)
         } else if self.project_names.borrow_mut().remove(event_id).is_some() {
             ReactionType::Project(None)
@@ -150,11 +142,6 @@ impl News {
     }
 
     pub fn relates_to_reaction_id(&self, reaction_id: &str) -> bool {
-        for i in &*self.approvals.borrow() {
-            if i == reaction_id {
-                return true;
-            }
-        }
         for i in self.section_names.borrow().keys() {
             if i == reaction_id {
                 return true;

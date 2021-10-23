@@ -1,7 +1,7 @@
 bot_user_id = '@botname:domain.org'
 reporting_room_id = '!roomid:domain.org'
 admin_room_id = '!adminroomid:domain.org'
-approval_emoji = '⭕'
+notice_emoji = '⭕'
 image_emoji = '📷️'
 image_markdown = '> ![]({{file}})'
 video_emoji = '📹️'
