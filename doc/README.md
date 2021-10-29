@@ -27,7 +27,9 @@ In this closed room administrative commands can be executed.
 | !update-config  | Updates the bot configuration by executing `update_config_command` command |
 
 ### Configuration
-In order to use the bot, two configuration files are required. The `config.toml` configuration file contains the bot settings (e.g. username/password, room ids, ...) and the definitions for the sections and projects. The second configuration file `template.md` serves as a template for the actual summary.
+In order to use the bot, two configuration files are required. The `config.toml` configuration file contains the bot settings (username, room ids, etc) and the definitions for the sections and projects. The second configuration file `template.md` serves as a template for the actual summary.
+
+The password for the bot is supplied via the `BOT_PASSWORD` environment variable. Setting this will depend on how you start the bot. 
 
 For both configuration files, examples are available that can be used as templates (see `example_config` folder). 
 
@@ -36,4 +38,4 @@ More configuration examples:
 
 ### Deployment
 The bot is available as [docker image](https://hub.docker.com/r/haeckerfelix/hebbot).
-You can find an example `docker-compose.yml` inside the `example_config` folder.
+You can find an example `docker-compose.yml` inside the `example_config` folder. Be sure to set the `BOT_PASSWORD` variable correctly before using it.

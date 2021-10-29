@@ -1,4 +1,5 @@
 bot_user_id = '@botname:domain.org'
+# bot password is specified via the BOT_PASSWORD environment variable
 reporting_room_id = '!roomid:domain.org'
 admin_room_id = '!adminroomid:domain.org'
 notice_emoji = '⭕'
