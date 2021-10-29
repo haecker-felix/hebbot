@@ -7,4 +7,4 @@ echo "Updating template.md..."
 wget -nv -O template.md https://mydomain.com/hebbot/template.md
 
 echo "Updating update_config.sh..."
-wget -nv -O template.md https://mydomain.com/hebbot/update_config.sh
+wget -nv -O update_config.sh https://mydomain.com/hebbot/update_config.sh
