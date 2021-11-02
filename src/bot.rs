@@ -390,8 +390,14 @@ impl EventCallback {
                     // Yes -> Try to add the message as news submission
                     let msg = if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
                         // we need related_event's sender
-                        let related_event_sender = room.get_member(related_event.sender()).await.unwrap().unwrap();
-                        if let Some(news) = utils::news_by_event(related_event, &related_event_sender) {
+                        let related_event_sender = room
+                            .get_member(related_event.sender())
+                            .await
+                            .unwrap()
+                            .unwrap();
+                        if let Some(news) =
+                            utils::news_by_event(related_event, &related_event_sender)
+                        {
                             self.add_news(news, false).await;
                             None
                         } else {
