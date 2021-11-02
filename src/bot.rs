@@ -235,6 +235,7 @@ impl EventHandler for EventCallback {
                     // Reporting room
                     if room.room_id() == self.0.reporting_room.room_id() {
                         self.on_reporting_room_reaction(
+                            &room,
                             &reaction_sender,
                             emoji,
                             &reaction_event_id,
@@ -348,6 +349,7 @@ impl EventCallback {
     /// - "project emoji" -> add a project description to a news entry
     async fn on_reporting_room_reaction(
         &self,
+        room: &Room,
         reaction_sender: &RoomMember,
         reaction_emoji: &str,
         reaction_event_id: &EventId,
@@ -387,7 +389,9 @@ impl EventCallback {
                     // Check if the reaction == notice emoji,
                     // Yes -> Try to add the message as news submission
                     let msg = if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
-                        if let Some(news) = utils::news_by_event(related_event, reaction_sender) {
+                        // we need related_event's sender
+                        let related_event_sender = room.get_member(related_event.sender()).await.unwrap().unwrap();
+                        if let Some(news) = utils::news_by_event(related_event, &related_event_sender) {
                             self.add_news(news, false).await;
                             None
                         } else {
