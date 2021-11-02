@@ -1,8 +1,8 @@
 use chrono::Datelike;
 use matrix_sdk::RoomMember;
 use rand::Rng;
-use ruma::MxcUri;
 use regex::Regex;
+use ruma::MxcUri;
 
 use std::collections::{BTreeMap, HashSet};
 use std::env;
@@ -318,9 +318,11 @@ fn prepare_message(msg: String) -> String {
     let msg = msg.trim();
 
     // Turn matrix room aliases into matrix.to links
-    let matrix_rooms_re = Regex::new("(^#([a-zA-Z0-9]|-|_)+:([a-zA-Z0-9]|-|_)+\\.([a-zA-Z0-9])+)").unwrap();
+    let matrix_rooms_re =
+        Regex::new("(^#([a-zA-Z0-9]|-|_)+:([a-zA-Z0-9]|-|_)+\\.([a-zA-Z0-9])+)").unwrap();
     let msg = matrix_rooms_re.replace_all(msg, "[$1](https://matrix.to/#/$1)");
-    let matrix_rooms_re = Regex::new(" (#([a-zA-Z0-9]|-|_)+:([a-zA-Z0-9]|-|_)+\\.([a-zA-Z0-9])+)").unwrap();
+    let matrix_rooms_re =
+        Regex::new(" (#([a-zA-Z0-9]|-|_)+:([a-zA-Z0-9]|-|_)+\\.([a-zA-Z0-9])+)").unwrap();
     let msg = matrix_rooms_re.replace_all(&msg, " [$1](https://matrix.to/#/$1)");
 
     // Turn <del> tags into markdown strikethrough
