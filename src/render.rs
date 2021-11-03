@@ -1,6 +1,7 @@
 use chrono::Datelike;
 use matrix_sdk::RoomMember;
 use rand::Rng;
+use regex::Regex;
 use ruma::MxcUri;
 
 use std::collections::{BTreeMap, HashSet};
@@ -315,6 +316,19 @@ fn news_md(news: &News, config: &Config) -> String {
 
 fn prepare_message(msg: String) -> String {
     let msg = msg.trim();
+
+    // Turn matrix room aliases into matrix.to links
+    let matrix_rooms_re =
+        Regex::new("(^#([a-zA-Z0-9]|-|_)+:([a-zA-Z0-9]|-|_)+\\.([a-zA-Z0-9])+)").unwrap();
+    let msg = matrix_rooms_re.replace_all(msg, "[$1](https://matrix.to/#/$1)");
+    let matrix_rooms_re =
+        Regex::new(" (#([a-zA-Z0-9]|-|_)+:([a-zA-Z0-9]|-|_)+\\.([a-zA-Z0-9])+)").unwrap();
+    let msg = matrix_rooms_re.replace_all(&msg, " [$1](https://matrix.to/#/$1)");
+
+    // Turn <del> tags into markdown strikethrough
+    // NOTE: this does not work for nested tag, whih shouldn't really happen in Matrix IM anyway
+    let strikethrough_re = Regex::new("<del>(.+?)</del>").unwrap();
+    let msg = strikethrough_re.replace_all(&msg, "~~$1~~");
 
     // quote message
     let msg = format!("> {}", msg);
