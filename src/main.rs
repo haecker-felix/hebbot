@@ -24,7 +24,7 @@ pub use section::Section;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    pretty_env_logger::init();
+    pretty_env_logger::init_timed();
 
     info!("Starting hebbot");
     bot::Bot::run().await;
