@@ -3,9 +3,12 @@
 .buildconfig
 ./config.json
 ./config.toml
+/config.toml
 ./store.json
+/store.json
 backup.json
 ./template.md
+/template.md
 *.json~
 start-ra.sh
 .flatpak
