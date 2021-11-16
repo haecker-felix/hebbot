@@ -1,3 +1,4 @@
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use std::collections::HashSet;
@@ -17,6 +18,7 @@ pub struct Config {
     pub image_markdown: String,
     pub video_emoji: String,
     pub video_markdown: String,
+    pub verbs: Vec<String>,
     pub update_config_command: String,
     pub editors: Vec<String>,
     pub sections: Vec<Section>,
@@ -116,6 +118,13 @@ impl Config {
         }
 
         sections_for_this_reporter
+    }
+
+    pub fn random_verb(&self) -> String {
+        let mut rng = rand::thread_rng();
+        let verbs = &self.verbs;
+        let id = rng.gen_range(0..verbs.len());
+        verbs[id].to_string()
     }
 
     fn validate_config(config: Self) -> ConfigResult {
