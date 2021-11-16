@@ -5,10 +5,15 @@
 ./config.toml
 ./store.json
 backup.json
-./template.md
 *.json~
 start-ra.sh
 .flatpak
 .vscode
 README_wip.md
 de.haeckerfelix.Hebbot.json
+./report_template.md
+/report_template.md
+./project_template.md
+/project_template.md
+./section_template.md
+/section_template.md

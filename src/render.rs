@@ -5,9 +5,6 @@ use regex::Regex;
 use ruma::MxcUri;
 
 use std::collections::{BTreeMap, HashSet};
-use std::env;
-use std::fs::File;
-use std::io::Read;
 
 use crate::{utils, Config, News, Project, Section};
 
@@ -51,6 +48,14 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
     let mut warnings: Vec<String> = Vec::new();
     let mut notes: Vec<String> = Vec::new();
+
+    // Load templates for rendering
+    let mut report_template =
+        utils::template_from_env("REPORT_TEMPLATE_PATH", "./report_template.md");
+    let section_template =
+        utils::template_from_env("SECTION_TEMPLATE_PATH", "./section_template.md");
+    let project_template =
+        utils::template_from_env("PROJECT_TEMPLATE_PATH", "./project_template.md");
 
     // Sort news entries into `RenderProject`s (`render_projects`)
     for news in news_list {
@@ -189,31 +194,44 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
     // Do the actual markdown rendering
     for (_, render_section) in render_sections {
-        let md_section = format!("# {}\n\n", render_section.section.title);
-        report_text += &md_section;
+        let section = render_section.section;
+        let mut section_local;
 
-        // First add news without project information
+        // Create section header
+        section_local = section_template.replace("{{section.title}}", &section.title);
+        section_local = section_local.replace("{{section.emoji}}", &section.emoji);
+
+        // First iterate over news without project information
+        let mut section_text = String::new(); // Holding string
         for news in render_section.news {
-            report_text += &news_md(&news, &config);
+            section_text += &news_md(&news, &config);
         }
+        section_local = section_local.replace("{{section.news}}", &section_text);
 
-        // Then add projects
+        // Then iterate over projects
+        let mut project_text = String::new();
         for render_project in render_section.projects {
             let project = render_project.project;
-            let project_repo = format!("[{}]({})", project.title, project.website);
-            let project_text = project.description.replace("{{project}}", &project_repo);
+            let mut project_local;
 
-            let project_md = format!(
-                "### {} [↗]({})\n\n\
-                {}\n\n",
-                project.title, project.website, project_text
-            );
-            report_text += &project_md;
+            // Create project header
+            project_local = project_template.replace("{{project.title}}", &project.title);
+            project_local = project_local.replace("{{project.emoji}}", &project.emoji);
+            project_local = project_local.replace("{{project.website}}", &project.website);
+            project_local = project_local.replace("{{project.description}}", &project.description);
 
+            // Iterate over project news items
+            let mut project_item = String::new();
             for news in render_project.news {
-                report_text += &news_md(&news, &config);
+                project_item += &news_md(&news, &config);
             }
+            project_local = project_local.replace("{{project.news}}", &project_item);
+
+            project_text += &project_local;
         }
+        section_local = section_local.replace("{{section.projects}}", &project_text);
+
+        report_text += &section_local;
     }
 
     // Create summary notes
@@ -232,19 +250,6 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
         videos.len(),
     );
     notes.insert(0, summary);
-
-    // Load template file
-    let path = match env::var("TEMPLATE_PATH") {
-        Ok(val) => val,
-        Err(_) => "./template.md".to_string(),
-    };
-
-    debug!("Trying to read template file from path: {:?}", path);
-
-    let mut file = File::open(path).expect("Unable to open template file");
-    let mut template = String::new();
-    file.read_to_string(&mut template)
-        .expect("Unable to read template file");
 
     // Replace template variables with content
     let display_name = utils::get_member_display_name(editor);
@@ -265,19 +270,20 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     projects = projects.replace("{", "");
     projects = projects.replace("}", "");
 
-    template = template.replace("{{weeknumber}}", &weeknumber);
-    template = template.replace("{{timespan}}", &timespan);
-    template = template.replace("{{projects}}", &projects);
-    template = template.replace("{{today}}", &today);
-    template = template.replace("{{author}}", &display_name);
-    template = template.replace("{{report}}", report_text.trim());
+    // Render sections/projects first so those templates can use variables
+    report_template = report_template.replace("{{sections}}", report_text.trim());
+    report_template = report_template.replace("{{weeknumber}}", &weeknumber);
+    report_template = report_template.replace("{{timespan}}", &timespan);
+    report_template = report_template.replace("{{projects}}", &projects);
+    report_template = report_template.replace("{{today}}", &today);
+    report_template = report_template.replace("{{author}}", &display_name);
 
     // Rerverse order to make it more easy to read
     warnings.reverse();
     notes.reverse();
 
     RenderResult {
-        rendered: template,
+        rendered: report_template,
         warnings,
         notes,
         images,
