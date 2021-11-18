@@ -7,7 +7,7 @@ use matrix_sdk::ruma::events::room::message::{
     FileMessageEventContent, MessageType, RoomMessageEventContent, SyncRoomMessageEvent,
 };
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
-use matrix_sdk::ruma::events::{AnyMessageEventContent, AnyRoomEvent};
+use matrix_sdk::ruma::events::AnyRoomEvent;
 use matrix_sdk::ruma::{EventId, MxcUri, RoomId, UserId};
 use matrix_sdk::uuid::Uuid;
 use matrix_sdk::{Client, RoomMember};
@@ -152,7 +152,6 @@ impl Bot {
             BotMsgType::ReportingRoomPlainNotice => (&self.reporting_room, RoomMessageEventContent::notice_plain(msg)),
         };
 
-        let content = AnyMessageEventContent::RoomMessage(content);
         let txn_id = Uuid::new_v4();
 
         room.send(content, Some(txn_id))
@@ -164,7 +163,6 @@ impl Bot {
     async fn send_reaction(&self, reaction: &str, msg_event_id: &EventId) {
         let content =
             ReactionEventContent::new(Relation::new(msg_event_id.clone(), reaction.to_string()));
-        let content = AnyMessageEventContent::Reaction(content);
         let txn_id = Uuid::new_v4();
 
         self.reporting_room
@@ -179,7 +177,7 @@ impl Bot {
 
         let file_content = FileMessageEventContent::plain(filename, url, None);
         let msgtype = MessageType::File(file_content);
-        let content = AnyMessageEventContent::RoomMessage(RoomMessageEventContent::new(msgtype));
+        let content = RoomMessageEventContent::new(msgtype);
         let txn_id = Uuid::new_v4();
 
         let room = if admin_room {
