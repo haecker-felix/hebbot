@@ -1,14 +1,16 @@
 use chrono::{DateTime, Utc};
+use matrix_sdk::config::SyncSettings;
+use matrix_sdk::event_handler::Ctx;
 use matrix_sdk::room::{Joined, Room};
-use matrix_sdk::ruma::events::reaction::{ReactionEventContent, Relation};
+use matrix_sdk::ruma::events::reaction::{ReactionEventContent, Relation, SyncReactionEvent};
 use matrix_sdk::ruma::events::room::message::{
-    FileMessageEventContent, MessageEventContent, MessageType,
+    FileMessageEventContent, MessageType, RoomMessageEventContent, SyncRoomMessageEvent,
 };
-use matrix_sdk::ruma::events::room::redaction::SyncRedactionEvent;
-use matrix_sdk::ruma::events::{AnyMessageEventContent, AnyRoomEvent, SyncMessageEvent};
+use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
+use matrix_sdk::ruma::events::{AnyMessageEventContent, AnyRoomEvent};
 use matrix_sdk::ruma::{EventId, MxcUri, RoomId, UserId};
 use matrix_sdk::uuid::Uuid;
-use matrix_sdk::{Client, EventHandler, RoomMember, SyncSettings};
+use matrix_sdk::{Client, RoomMember};
 
 use std::convert::TryFrom;
 use std::env;
@@ -37,7 +39,7 @@ impl Bot {
         let password = env::var("BOT_PASSWORD").expect("BOT_PASSWORD env variable not specified");
 
         let user = UserId::try_from(username).expect("Unable to parse bot user id");
-        let client = Client::new_from_user_id(user.clone()).await.unwrap();
+        let client = Client::new_from_user_id(&user).await.unwrap();
 
         Self::login(&client, user.localpart(), &password).await;
 
@@ -100,9 +102,15 @@ impl Bot {
                 .await;
         }
 
-        // Setup event handler
-        let handler = Box::new(EventCallback(bot.clone()));
-        bot.client.set_event_handler(handler).await;
+        // Setup event handlers
+        bot.client
+            .register_event_handler_context(bot.clone())
+            .register_event_handler(Self::on_room_message)
+            .await
+            .register_event_handler(Self::on_room_reaction)
+            .await
+            .register_event_handler(Self::on_room_redaction)
+            .await;
 
         info!("Started syncing…");
         bot.client.sync(SyncSettings::new()).await;
@@ -134,14 +142,14 @@ impl Bot {
 
         #[rustfmt::skip]
         let (room, content) = match msg_type{
-            BotMsgType::AdminRoomHtmlNotice => (&self.admin_room, MessageEventContent::notice_html(msg, msg)),
-            BotMsgType::AdminRoomHtmlText => (&self.admin_room, MessageEventContent::text_html(msg, msg)),
-            BotMsgType::AdminRoomPlainText => (&self.admin_room, MessageEventContent::text_plain(msg)),
-            BotMsgType::AdminRoomPlainNotice => (&self.admin_room, MessageEventContent::notice_plain(msg)),
-            BotMsgType::ReportingRoomHtmlText => (&self.reporting_room, MessageEventContent::text_html(msg, msg)),
-            BotMsgType::ReportingRoomPlainText => (&self.reporting_room, MessageEventContent::text_plain(msg)),
-            BotMsgType::ReportingRoomHtmlNotice => (&self.reporting_room, MessageEventContent::notice_html(msg, msg)),
-            BotMsgType::ReportingRoomPlainNotice => (&self.reporting_room, MessageEventContent::notice_plain(msg)),
+            BotMsgType::AdminRoomHtmlNotice => (&self.admin_room, RoomMessageEventContent::notice_html(msg, msg)),
+            BotMsgType::AdminRoomHtmlText => (&self.admin_room, RoomMessageEventContent::text_html(msg, msg)),
+            BotMsgType::AdminRoomPlainText => (&self.admin_room, RoomMessageEventContent::text_plain(msg)),
+            BotMsgType::AdminRoomPlainNotice => (&self.admin_room, RoomMessageEventContent::notice_plain(msg)),
+            BotMsgType::ReportingRoomHtmlText => (&self.reporting_room, RoomMessageEventContent::text_html(msg, msg)),
+            BotMsgType::ReportingRoomPlainText => (&self.reporting_room, RoomMessageEventContent::text_plain(msg)),
+            BotMsgType::ReportingRoomHtmlNotice => (&self.reporting_room, RoomMessageEventContent::notice_html(msg, msg)),
+            BotMsgType::ReportingRoomPlainNotice => (&self.reporting_room, RoomMessageEventContent::notice_plain(msg)),
         };
 
         let content = AnyMessageEventContent::RoomMessage(content);
@@ -171,7 +179,7 @@ impl Bot {
 
         let file_content = FileMessageEventContent::plain(filename, url, None);
         let msgtype = MessageType::File(file_content);
-        let content = AnyMessageEventContent::RoomMessage(MessageEventContent::new(msgtype));
+        let content = AnyMessageEventContent::RoomMessage(RoomMessageEventContent::new(msgtype));
         let txn_id = Uuid::new_v4();
 
         let room = if admin_room {
@@ -184,37 +192,32 @@ impl Bot {
             .await
             .expect("Unable to send file");
     }
-}
 
-// Setup EventHandler to handle incoming matrix events
-struct EventCallback(Bot);
-
-#[async_trait::async_trait]
-impl EventHandler for EventCallback {
     /// Handling room messages events
-    async fn on_room_message(&self, room: Room, event: &SyncMessageEvent<MessageEventContent>) {
+    async fn on_room_message(event: SyncRoomMessageEvent, room: Room, Ctx(bot): Ctx<Bot>) {
         if let Room::Joined(ref _joined) = room {
             // Standard text message
-            if let Some(text) = utils::get_message_event_text(event) {
+            if let Some(text) = utils::get_message_event_text(&event) {
                 let member = room.get_member(&event.sender).await.unwrap().unwrap();
                 let id = &event.event_id;
 
                 // Reporting room
-                if room.room_id() == self.0.reporting_room.room_id() {
-                    self.on_reporting_room_msg(text.clone(), &member, id).await;
+                if room.room_id() == bot.reporting_room.room_id() {
+                    bot.on_reporting_room_msg(text.clone(), &member, id).await;
                 }
 
                 // Admin room
-                if room.room_id() == self.0.admin_room.room_id() {
-                    self.on_admin_room_message(text, &member).await;
+                if room.room_id() == bot.admin_room.room_id() {
+                    bot.on_admin_room_message(text, &member).await;
                 }
             }
 
             // Message edit
-            if let Some((edited_msg_event_id, text)) = utils::get_edited_message_event_text(event) {
+            if let Some((edited_msg_event_id, text)) = utils::get_edited_message_event_text(&event)
+            {
                 // Reporting room
-                if room.room_id() == self.0.reporting_room.room_id() {
-                    self.on_reporting_room_msg_edit(text.clone(), &edited_msg_event_id)
+                if room.room_id() == bot.reporting_room.room_id() {
+                    bot.on_reporting_room_msg_edit(text.clone(), &edited_msg_event_id)
                         .await;
                 }
             }
@@ -222,7 +225,7 @@ impl EventHandler for EventCallback {
     }
 
     /// Handling room reaction events
-    async fn on_room_reaction(&self, room: Room, event: &SyncMessageEvent<ReactionEventContent>) {
+    async fn on_room_reaction(event: SyncReactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
         if let Room::Joined(ref _joined) = room {
             let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
             let reaction_event_id = event.event_id.clone();
@@ -233,8 +236,8 @@ impl EventHandler for EventCallback {
             if let Some(related_event) = utils::room_event_by_id(&room, &related_event_id).await {
                 if let Some(related_msg_type) = utils::message_type(&related_event).await {
                     // Reporting room
-                    if room.room_id() == self.0.reporting_room.room_id() {
-                        self.on_reporting_room_reaction(
+                    if room.room_id() == bot.reporting_room.room_id() {
+                        bot.on_reporting_room_reaction(
                             &room,
                             &reaction_sender,
                             emoji,
@@ -260,21 +263,19 @@ impl EventHandler for EventCallback {
     }
 
     /// Handling room redaction events (= something got removed/reverted)
-    async fn on_room_redaction(&self, room: Room, event: &SyncRedactionEvent) {
+    async fn on_room_redaction(event: SyncRoomRedactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
         if let Room::Joined(ref _joined) = room {
             let redacted_event_id = event.redacts.clone();
             let member = room.get_member(&event.sender).await.unwrap().unwrap();
 
             // Reporting room
-            if room.room_id() == self.0.reporting_room.room_id() {
-                self.on_reporting_room_redaction(&member, &redacted_event_id)
+            if room.room_id() == bot.reporting_room.room_id() {
+                bot.on_reporting_room_redaction(&member, &redacted_event_id)
                     .await;
             }
         }
     }
-}
 
-impl EventCallback {
     /// New message in reporting room
     /// - When the bot gets mentioned at the beginning of the message,
     ///   the message will get stored as News in NewsStore
@@ -285,7 +286,7 @@ impl EventCallback {
         event_id: &EventId,
     ) {
         // We're going to ignore all messages, expect it mentions the bot at the beginning
-        let bot_id = self.0.client.user_id().await.unwrap();
+        let bot_id = self.client.user_id().await.unwrap();
         if !utils::msg_starts_with_mention(bot_id, message.clone()) {
             return;
         }
@@ -312,12 +313,12 @@ impl EventCallback {
         edited_msg_event_id: &EventId,
     ) {
         let event_id = edited_msg_event_id.to_string();
-        let bot = self.0.client.user_id().await.unwrap();
+        let bot = self.client.user_id().await.unwrap();
         let updated_message = utils::remove_bot_name(&updated_message, &bot);
         let link = self.message_link(edited_msg_event_id.to_string());
 
         let message = {
-            let news_store = self.0.news_store.lock().unwrap();
+            let news_store = self.news_store.lock().unwrap();
             let msg = if let Some(news) = news_store.news_by_message_id(&event_id) {
                 news.set_message(updated_message);
                 if news.is_assigned() {
@@ -337,8 +338,7 @@ impl EventCallback {
         };
 
         if let Some(message) = message {
-            self.0
-                .send_message(&message, BotMsgType::AdminRoomHtmlNotice)
+            self.send_message(&message, BotMsgType::AdminRoomHtmlNotice)
                 .await;
         }
     }
@@ -359,15 +359,15 @@ impl EventCallback {
         // Only allow editors to use general commands
         // or the general public to use the notice emoji
         let sender_is_editor = self.is_editor(reaction_sender).await;
-        if reaction_sender.user_id().as_str() == self.0.config.bot_user_id
-            || (!sender_is_editor && !utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji))
+        if reaction_sender.user_id().as_str() == self.config.bot_user_id
+            || (!sender_is_editor && !utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji))
         {
             return;
         }
 
         let message: Option<String> = {
             let reaction_event_id = reaction_event_id.to_string();
-            let reaction_type = self.0.config.reaction_type_by_emoji(reaction_emoji);
+            let reaction_type = self.config.reaction_type_by_emoji(reaction_emoji);
             let related_event_id = related_event.event_id().to_string();
             let related_event_timestamp: DateTime<Utc> = related_event
                 .origin_server_ts()
@@ -388,7 +388,7 @@ impl EventCallback {
                 MessageType::Text(_) => {
                     // Check if the reaction == notice emoji,
                     // Yes -> Try to add the message as news submission
-                    let msg = if utils::emoji_cmp(reaction_emoji, &self.0.config.notice_emoji) {
+                    let msg = if utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji) {
                         // we need related_event's sender
                         let related_event_sender = room
                             .get_member(related_event.sender())
@@ -411,7 +411,6 @@ impl EventCallback {
                     // Check if related message is a news entry
                     // (Adding the entry to a project / section by using the corresponding reaction emoji)
                     } else if let Some(news) = self
-                        .0
                         .news_store
                         .lock()
                         .unwrap()
@@ -472,7 +471,7 @@ impl EventCallback {
                 MessageType::Image(image) => match reaction_type {
                     ReactionType::Image => {
                         let reporter_id = reaction_sender.user_id().to_string();
-                        let news_store = self.0.news_store.lock().unwrap();
+                        let news_store = self.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
                             &related_event.sender().to_string(),
                             &related_event_timestamp,
@@ -511,7 +510,7 @@ impl EventCallback {
                 MessageType::Video(video) => match reaction_type {
                     ReactionType::Video => {
                         let reporter_id = reaction_sender.user_id().to_string();
-                        let news_store = self.0.news_store.lock().unwrap();
+                        let news_store = self.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
                             &related_event.sender().to_string(),
                             &related_event_timestamp,
@@ -557,13 +556,12 @@ impl EventCallback {
 
         // Send confirm message to admin room
         if let Some(message) = message {
-            self.0
-                .send_message(&message, BotMsgType::AdminRoomHtmlNotice)
+            self.send_message(&message, BotMsgType::AdminRoomHtmlNotice)
                 .await;
         }
 
         // Update stored news
-        let news_store = self.0.news_store.lock().unwrap();
+        let news_store = self.news_store.lock().unwrap();
         news_store.write_data();
     }
 
@@ -573,7 +571,7 @@ impl EventCallback {
     async fn on_reporting_room_redaction(&self, member: &RoomMember, redacted_event_id: &EventId) {
         let message = {
             let is_editor = self.is_editor(member).await;
-            let mut news_store = self.0.news_store.lock().unwrap();
+            let mut news_store = self.news_store.lock().unwrap();
             let redacted_event_id = redacted_event_id.to_string();
             let link = self.message_link(redacted_event_id.clone());
 
@@ -615,8 +613,7 @@ impl EventCallback {
 
         // Send confirm message to admin room
         if let Some(message) = message {
-            self.0
-                .send_message(&message, BotMsgType::AdminRoomHtmlNotice)
+            self.send_message(&message, BotMsgType::AdminRoomHtmlNotice)
                 .await;
         }
     }
@@ -634,8 +631,7 @@ impl EventCallback {
         // Check if the sender is a editor (= has the permission to use commands)
         if !self.is_editor(member).await {
             let msg = "You don’t have the permission to use commands.";
-            self.0
-                .send_message(msg, BotMsgType::AdminRoomPlainNotice)
+            self.send_message(msg, BotMsgType::AdminRoomPlainNotice)
                 .await;
             return;
         }
@@ -683,8 +679,7 @@ impl EventCallback {
             !status \n\
             !update-config";
 
-        self.0
-            .send_message(help, BotMsgType::AdminRoomPlainNotice)
+        self.send_message(help, BotMsgType::AdminRoomPlainNotice)
             .await;
     }
 
@@ -696,14 +691,13 @@ impl EventCallback {
             version
         );
 
-        self.0
-            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+        self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
             .await;
     }
 
     async fn clear_command(&self) {
         let msg = {
-            let mut news_store = self.0.news_store.lock().unwrap();
+            let mut news_store = self.news_store.lock().unwrap();
 
             let news = news_store.news();
             news_store.clear_news();
@@ -711,15 +705,14 @@ impl EventCallback {
             format!("Cleared {} news entries!", news.len())
         };
 
-        self.0
-            .send_message(&msg, BotMsgType::AdminRoomPlainNotice)
+        self.send_message(&msg, BotMsgType::AdminRoomPlainNotice)
             .await;
     }
 
     async fn details_command(&self, term: &str) {
-        let result_project = self.0.config.project_by_name(term);
-        let result_section = self.0.config.section_by_name(term);
-        let result_reaction = self.0.config.reaction_type_by_emoji(term);
+        let result_project = self.config.project_by_name(term);
+        let result_section = self.config.section_by_name(term);
+        let result_reaction = self.config.reaction_type_by_emoji(term);
 
         let msg = if let Some(project) = result_project {
             project.html_details()
@@ -736,23 +729,21 @@ impl EventCallback {
             }
         };
 
-        self.0
-            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+        self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
             .await;
     }
 
     async fn list_config_command(&self) {
-        let config = self.0.config.clone();
+        let config = self.config.clone();
         let toml = toml::to_string_pretty(&config).unwrap();
 
         let msg = format!("<pre><code>{}</code></pre>\n", toml);
-        self.0
-            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+        self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
             .await;
     }
 
     async fn list_projects_command(&self) {
-        let config = self.0.config.clone();
+        let config = self.config.clone();
 
         let mut list = String::new();
         for e in config.projects {
@@ -763,13 +754,12 @@ impl EventCallback {
         }
 
         let msg = format!("List of projects:\n<pre><code>{}</code></pre>\n", list);
-        self.0
-            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+        self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
             .await;
     }
 
     async fn list_sections_command(&self) {
-        let config = self.0.config.clone();
+        let config = self.config.clone();
 
         let mut list = String::new();
         for e in config.sections {
@@ -777,16 +767,15 @@ impl EventCallback {
         }
 
         let msg = format!("List of sections:\n<pre><code>{}</code></pre>\n", list);
-        self.0
-            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+        self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
             .await;
     }
 
     async fn render_command(&self, editor: &RoomMember) {
         let result = {
-            let news_store = self.0.news_store.lock().unwrap();
+            let news_store = self.news_store.lock().unwrap();
             let news = news_store.news();
-            let config = self.0.config.clone();
+            let config = self.config.clone();
 
             render::render(news, config, editor)
         };
@@ -794,30 +783,26 @@ impl EventCallback {
         // Upload rendered content as markdown file
         let mut bytes = result.rendered.as_bytes();
         let response = self
-            .0
             .client
             .upload(&mime::TEXT_PLAIN_UTF_8, &mut bytes)
             .await
             .expect("Can't upload rendered file.");
 
         // Send file
-        self.0
-            .send_file(response.content_uri, "rendered.md".to_string(), true)
+        self.send_file(response.content_uri, "rendered.md".to_string(), true)
             .await;
 
         // Send warnings
         let warnings = utils::format_messages(true, &result.warnings);
         if !result.warnings.is_empty() {
-            self.0
-                .send_message(&warnings, BotMsgType::AdminRoomHtmlNotice)
+            self.send_message(&warnings, BotMsgType::AdminRoomHtmlNotice)
                 .await;
         }
 
         // Send notes
         let notes = utils::format_messages(false, &result.notes);
         if !result.notes.is_empty() {
-            self.0
-                .send_message(&notes, BotMsgType::AdminRoomHtmlNotice)
+            self.send_message(&notes, BotMsgType::AdminRoomHtmlNotice)
                 .await;
         }
 
@@ -825,19 +810,18 @@ impl EventCallback {
         let mut files = result.images.clone();
         files.append(&mut result.videos.clone());
         if !files.is_empty() {
-            self.0
-                .send_message(
-                    "Use this command to download all files:",
-                    BotMsgType::AdminRoomHtmlNotice,
-                )
-                .await;
+            self.send_message(
+                "Use this command to download all files:",
+                BotMsgType::AdminRoomHtmlNotice,
+            )
+            .await;
 
             let mut curl_command = "curl".to_string();
             for (filename, uri) in &files {
                 if uri.is_valid() {
                     let url = format!(
                         "{}_matrix/media/r0/download/{}/{}",
-                        self.0.client.homeserver().await.to_string(),
+                        self.client.homeserver().await.to_string(),
                         uri.server_name().unwrap(),
                         uri.media_id().unwrap()
                     );
@@ -847,28 +831,25 @@ impl EventCallback {
             }
 
             let msg = format!("<pre><code>{}</code></pre>\n", curl_command);
-            self.0
-                .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+            self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
                 .await;
         }
     }
 
     async fn restart_command(&self) {
-        self.0
-            .send_message("Restarting hebbot…", BotMsgType::AdminRoomPlainNotice)
+        self.send_message("Restarting hebbot…", BotMsgType::AdminRoomPlainNotice)
             .await;
         Command::new("/proc/self/exe").exec();
     }
 
     async fn say_command(&self, msg: &str) {
-        self.0
-            .send_message(msg, BotMsgType::ReportingRoomPlainText)
+        self.send_message(msg, BotMsgType::ReportingRoomPlainText)
             .await;
     }
 
     async fn status_command(&self) {
         let msg = {
-            let news_store = self.0.news_store.lock().unwrap();
+            let news_store = self.news_store.lock().unwrap();
             let news = news_store.news();
 
             let mut assigned_count = 0;
@@ -898,20 +879,18 @@ impl EventCallback {
             )
         };
 
-        self.0
-            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+        self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
             .await;
     }
 
     async fn update_config_command(&self) {
-        self.0
-            .send_message(
-                "Updating bot configuration…",
-                BotMsgType::AdminRoomHtmlNotice,
-            )
-            .await;
+        self.send_message(
+            "Updating bot configuration…",
+            BotMsgType::AdminRoomHtmlNotice,
+        )
+        .await;
 
-        let command = self.0.config.update_config_command.clone();
+        let command = self.config.update_config_command.clone();
         let msg = match utils::execute_command(&command).await {
             Some(stdout) => format!(
                 "✅ Updated bot configuration!<br><pre><code>{}</code></pre>",
@@ -920,16 +899,14 @@ impl EventCallback {
             None => "❌ Unable to run update command. Check bot logs for more details.".to_string(),
         };
 
-        self.0
-            .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+        self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
             .await;
         self.restart_command().await;
     }
 
     async fn unrecognized_command(&self) {
         let msg = "Unrecognized command. Use !help to list available commands.";
-        self.0
-            .send_message(msg, BotMsgType::AdminRoomPlainNotice)
+        self.send_message(msg, BotMsgType::AdminRoomPlainNotice)
             .await;
     }
 
@@ -941,59 +918,54 @@ impl EventCallback {
                     "✅ Thanks for the report {}, I'll store your update!",
                     news.reporter_display_name
                 );
-                self.0
-                    .send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
+                self.send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
                     .await;
             }
 
             let link = self.message_link(news.event_id.to_string());
             let msg = format!("✅ {} submitted a news entry. [{}]", news.reporter_id, link);
-            self.0
-                .send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+            self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
                 .await;
 
             // remove bot name from message
-            let bot_id = self.0.client.user_id().await.unwrap();
+            let bot_id = self.client.user_id().await.unwrap();
             news.set_message(utils::remove_bot_name(&news.message(), &bot_id));
 
             // Pre-populate with emojis to facilitate the editor's work
-            for project in self.0.config.projects_by_usual_reporter(&news.reporter_id) {
-                self.0
-                    .send_reaction(
-                        &project.emoji,
-                        &EventId::try_from(news.event_id.as_str()).unwrap(),
-                    )
-                    .await;
+            for project in self.config.projects_by_usual_reporter(&news.reporter_id) {
+                self.send_reaction(
+                    &project.emoji,
+                    &EventId::try_from(news.event_id.as_str()).unwrap(),
+                )
+                .await;
             }
-            for section in self.0.config.sections_by_usual_reporter(&news.reporter_id) {
-                self.0
-                    .send_reaction(
-                        &section.emoji,
-                        &EventId::try_from(news.event_id.as_str()).unwrap(),
-                    )
-                    .await;
+            for section in self.config.sections_by_usual_reporter(&news.reporter_id) {
+                self.send_reaction(
+                    &section.emoji,
+                    &EventId::try_from(news.event_id.as_str()).unwrap(),
+                )
+                .await;
             }
 
             // Save it in message store
-            self.0.news_store.lock().unwrap().add_news(news);
+            self.news_store.lock().unwrap().add_news(news);
         } else {
             let msg = format!(
                 "❌ {}: Your update is too short and was not stored. This limitation was set-up to limit spam.",
                 news.reporter_display_name
             );
-            self.0
-                .send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
+            self.send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
                 .await;
         }
     }
 
     async fn is_editor(&self, member: &RoomMember) -> bool {
         let user_id = member.user_id().to_string();
-        self.0.config.editors.contains(&user_id)
+        self.config.editors.contains(&user_id)
     }
 
     fn message_link(&self, event_id: String) -> String {
-        let room_id = self.0.config.reporting_room_id.clone();
+        let room_id = self.config.reporting_room_id.clone();
         format!(
             "<a href=\"https://matrix.to/#/{}/{}\">open message</a>",
             room_id, event_id

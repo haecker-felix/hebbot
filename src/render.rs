@@ -1,8 +1,8 @@
 use chrono::Datelike;
+use matrix_sdk::ruma::MxcUri;
 use matrix_sdk::RoomMember;
 use rand::Rng;
 use regex::Regex;
-use ruma::MxcUri;
 
 use std::collections::{BTreeMap, HashSet};
 use std::env;

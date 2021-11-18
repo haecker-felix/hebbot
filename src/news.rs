@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use ruma::MxcUri;
+use matrix_sdk::ruma::MxcUri;
 use serde::{Deserialize, Serialize};
 
 use std::cell::RefCell;
