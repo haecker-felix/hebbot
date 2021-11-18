@@ -5,7 +5,7 @@ use matrix_sdk::ruma::events::room::message::{
     MessageType, Relation, Replacement, RoomMessageEventContent, SyncRoomMessageEvent,
     TextMessageEventContent,
 };
-use matrix_sdk::ruma::events::{AnyMessageEvent, AnyRoomEvent, MessageEvent, SyncMessageEvent};
+use matrix_sdk::ruma::events::{AnyMessageEvent, AnyRoomEvent, MessageEvent};
 use matrix_sdk::ruma::{EventId, UserId};
 use matrix_sdk::{BaseRoomMember, RoomMember};
 use regex::Regex;
@@ -70,15 +70,11 @@ pub async fn message_type(room_event: &AnyRoomEvent) -> Option<MessageType> {
 
 /// A simplified way of getting the text from a message event
 pub fn get_message_event_text(event: &SyncRoomMessageEvent) -> Option<String> {
-    if let SyncMessageEvent {
-        content:
-            RoomMessageEventContent {
-                msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
-                relates_to: None,
-                ..
-            },
+    if let RoomMessageEventContent {
+        msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
+        relates_to: None,
         ..
-    } = event
+    } = &event.content
     {
         return Some(msg_body.to_owned());
     }
@@ -87,23 +83,11 @@ pub fn get_message_event_text(event: &SyncRoomMessageEvent) -> Option<String> {
 
 /// A simplified way of getting an edited message
 pub fn get_edited_message_event_text(event: &SyncRoomMessageEvent) -> Option<(EventId, String)> {
-    if let SyncMessageEvent {
-        content:
-            RoomMessageEventContent {
-                relates_to:
-                    Some(Relation::Replacement {
-                        0:
-                            Replacement {
-                                event_id,
-                                new_content,
-                                ..
-                            },
-                        ..
-                    }),
-                ..
-            },
+    if let Some(Relation::Replacement(Replacement {
+        event_id,
+        new_content,
         ..
-    } = event
+    })) = &event.content.relates_to
     {
         if let RoomMessageEventContent {
             msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
