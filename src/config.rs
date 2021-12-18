@@ -122,9 +122,8 @@ impl Config {
 
     pub fn random_verb(&self) -> String {
         let mut rng = rand::thread_rng();
-        let verbs = &self.verbs;
-        let id = rng.gen_range(0..verbs.len());
-        verbs[id].to_string()
+        let id = rng.gen_range(0..self.verbs.len());
+        self.verbs[id].to_string()
     }
 
     fn validate_config(config: Self) -> ConfigResult {
