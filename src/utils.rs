@@ -76,7 +76,7 @@ pub async fn message_type(room_event: &AnyRoomEvent) -> Option<MessageType> {
 pub fn get_message_event_text(event: &SyncRoomMessageEvent) -> Option<String> {
     if let RoomMessageEventContent {
         msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
-        relates_to: None,
+        relates_to: _,
         ..
     } = &event.content
     {
