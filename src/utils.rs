@@ -188,18 +188,18 @@ pub async fn execute_command(launch: &str) -> Option<String> {
     Some(lines)
 }
 
-pub fn template_from_env(env_var_name: &str, fallback: &str) -> String {
+pub fn file_from_env(env_var_name: &str, fallback: &str) -> String {
     let path = match env::var(env_var_name) {
         Ok(val) => val,
         Err(_) => fallback.to_string(),
     };
 
-    debug!("Trying to read template file from path: {:?}", path);
+    debug!("Trying to read file from path: {:?}", path);
 
-    let mut file = File::open(path).expect("Unable to open template file");
+    let mut file = File::open(path).expect("Unable to open file");
     let mut template = String::new();
     file.read_to_string(&mut template)
-        .expect("Unable to read template file");
+        .expect("Unable to read file");
 
     template
 }

@@ -232,7 +232,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     // Load the section template
     let env_name = "REPORT_TEMPLATE_PATH";
     let fallback = "./report_template.md";
-    let mut rendered = utils::template_from_env(env_name, fallback);
+    let mut rendered = utils::file_from_env(env_name, fallback);
 
     // Replace the template variables with values
     rendered = rendered.replace("{{sections}}", rendered_report.trim());
@@ -255,19 +255,19 @@ fn render_section_md(render_section: &RenderSection, config: &Config) -> String 
     // Load the section template
     let env_name = "SECTION_TEMPLATE_PATH";
     let fallback = "./section_template.md";
-    let mut rendered_section = utils::template_from_env(env_name, fallback);
+    let mut rendered_section = utils::file_from_env(env_name, fallback);
 
     // First iterate over news without project information
     let mut rendered_news = String::new();
     for news in &render_section.news {
-        rendered_news += &render_news_md(&news, &config);
+        rendered_news += &render_news_md(news, config);
     }
     rendered_news = rendered_news.trim().to_string();
 
     // Then iterate over projects
     let mut rendered_projects = String::new();
     for render_project in &render_section.projects {
-        rendered_projects += &render_project_md(render_project, &config);
+        rendered_projects += &render_project_md(render_project, config);
     }
 
     // Replace the template variables with values
@@ -284,12 +284,12 @@ fn render_project_md(render_project: &RenderProject, config: &Config) -> String 
     // Load the project template
     let env_name = "PROJECT_TEMPLATE_PATH";
     let fallback = "./project_template.md";
-    let mut rendered_project = utils::template_from_env(env_name, fallback);
+    let mut rendered_project = utils::file_from_env(env_name, fallback);
 
     // Iterate over project news items
     let mut rendered_news = String::new();
     for news in &render_project.news {
-        rendered_news += &render_news_md(&news, &config);
+        rendered_news += &render_news_md(news, config);
     }
     rendered_news = rendered_news.trim().to_string();
 

@@ -2,9 +2,6 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use std::collections::HashSet;
-use std::env;
-use std::fs::File;
-use std::io::Read;
 
 use crate::{utils, Project, ReactionType, Section};
 
@@ -33,18 +30,7 @@ pub struct ConfigResult {
 
 impl Config {
     pub fn read() -> ConfigResult {
-        let path = match env::var("CONFIG_PATH") {
-            Ok(val) => val,
-            Err(_) => "./config.toml".to_string(),
-        };
-
-        debug!("Trying to read configuration file from path: {:?}", path);
-
-        let mut file = File::open(path).expect("Unable to open configuration file");
-        let mut data = String::new();
-        file.read_to_string(&mut data)
-            .expect("Unable to read configuration file");
-
+        let data = utils::file_from_env("CONFIG_PATH", "./config.toml");
         let config: Config = toml::from_str(&data).expect("Unable to parse config file");
         Self::validate_config(config)
     }
