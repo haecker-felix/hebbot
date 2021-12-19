@@ -9,7 +9,7 @@ draft: false
 
 Update on what happened across the X project in the week from {{timespan}}.
 
-{{report}}
+{{sections}}
 
 # That’s all for this week!
 

@@ -4,9 +4,6 @@ use regex::Regex;
 use ruma::MxcUri;
 
 use std::collections::{BTreeMap, HashSet};
-use std::env;
-use std::fs::File;
-use std::io::Read;
 
 use crate::{utils, Config, News, Project, Section};
 
@@ -42,7 +39,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
     let mut news_count = 0;
     let mut not_assigned = 0;
-    let mut report_text = String::new();
+    let mut rendered_report = String::new();
     let mut project_names: HashSet<String> = HashSet::new();
 
     let mut images: Vec<(String, MxcUri)> = Vec::new();
@@ -188,34 +185,11 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
     // Do the actual markdown rendering
     for (_, render_section) in render_sections {
-        let md_section = format!("# {}\n\n", render_section.section.title);
-        report_text += &md_section;
-
-        // First add news without project information
-        for news in render_section.news {
-            report_text += &news_md(&news, &config);
-        }
-
-        // Then add projects
-        for render_project in render_section.projects {
-            let project = render_project.project;
-            let project_repo = format!("[{}]({})", project.title, project.website);
-            let project_text = project.description.replace("{{project}}", &project_repo);
-
-            let project_md = format!(
-                "### {} [↗]({})\n\n\
-                {}\n\n",
-                project.title, project.website, project_text
-            );
-            report_text += &project_md;
-
-            for news in render_project.news {
-                report_text += &news_md(&news, &config);
-            }
-        }
+        let rendered_section = render_section_md(&render_section, &config);
+        rendered_report += &format!("{}\n\n", rendered_section);
     }
 
-    // Create summary notes
+    // Create summary notes for the admin room
     if not_assigned != 0 {
         let note = format!(
             "{} news are not included because of project/section assignment is missing. Use !status command to list them.",
@@ -232,18 +206,9 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     );
     notes.insert(0, summary);
 
-    // Load template file
-    let path = match env::var("TEMPLATE_PATH") {
-        Ok(val) => val,
-        Err(_) => "./template.md".to_string(),
-    };
-
-    debug!("Trying to read template file from path: {:?}", path);
-
-    let mut file = File::open(path).expect("Unable to open template file");
-    let mut template = String::new();
-    file.read_to_string(&mut template)
-        .expect("Unable to read template file");
+    // Rerverse order to make it more easy to read
+    warnings.reverse();
+    notes.reverse();
 
     // Replace template variables with content
     let display_name = utils::get_member_display_name(editor);
@@ -264,19 +229,21 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     projects = projects.replace("{", "");
     projects = projects.replace("}", "");
 
-    template = template.replace("{{weeknumber}}", &weeknumber);
-    template = template.replace("{{timespan}}", &timespan);
-    template = template.replace("{{projects}}", &projects);
-    template = template.replace("{{today}}", &today);
-    template = template.replace("{{author}}", &display_name);
-    template = template.replace("{{report}}", report_text.trim());
+    // Load the section template
+    let env_name = "REPORT_TEMPLATE_PATH";
+    let fallback = "./report_template.md";
+    let mut rendered = utils::file_from_env(env_name, fallback);
 
-    // Rerverse order to make it more easy to read
-    warnings.reverse();
-    notes.reverse();
+    // Replace the template variables with values
+    rendered = rendered.replace("{{sections}}", rendered_report.trim());
+    rendered = rendered.replace("{{weeknumber}}", &weeknumber);
+    rendered = rendered.replace("{{timespan}}", &timespan);
+    rendered = rendered.replace("{{projects}}", &projects);
+    rendered = rendered.replace("{{today}}", &today);
+    rendered = rendered.replace("{{author}}", &display_name);
 
     RenderResult {
-        rendered: template,
+        rendered,
         warnings,
         notes,
         images,
@@ -284,7 +251,60 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     }
 }
 
-fn news_md(news: &News, config: &Config) -> String {
+fn render_section_md(render_section: &RenderSection, config: &Config) -> String {
+    // Load the section template
+    let env_name = "SECTION_TEMPLATE_PATH";
+    let fallback = "./section_template.md";
+    let mut rendered_section = utils::file_from_env(env_name, fallback);
+
+    // First iterate over news without project information
+    let mut rendered_news = String::new();
+    for news in &render_section.news {
+        rendered_news += &render_news_md(news, config);
+    }
+    rendered_news = rendered_news.trim().to_string();
+
+    // Then iterate over projects
+    let mut rendered_projects = String::new();
+    for render_project in &render_section.projects {
+        rendered_projects += &render_project_md(render_project, config);
+    }
+
+    // Replace the template variables with values
+    let section = &render_section.section;
+    rendered_section = rendered_section.replace("{{section.title}}", &section.title);
+    rendered_section = rendered_section.replace("{{section.emoji}}", &section.emoji);
+    rendered_section = rendered_section.replace("{{section.news}}", &rendered_news);
+    rendered_section = rendered_section.replace("{{section.projects}}", &rendered_projects);
+
+    rendered_section.trim().to_string()
+}
+
+fn render_project_md(render_project: &RenderProject, config: &Config) -> String {
+    // Load the project template
+    let env_name = "PROJECT_TEMPLATE_PATH";
+    let fallback = "./project_template.md";
+    let mut rendered_project = utils::file_from_env(env_name, fallback);
+
+    // Iterate over project news items
+    let mut rendered_news = String::new();
+    for news in &render_project.news {
+        rendered_news += &render_news_md(news, config);
+    }
+    rendered_news = rendered_news.trim().to_string();
+
+    // Replace the template variables with values
+    let project = &render_project.project;
+    rendered_project = rendered_project.replace("{{project.title}}", &project.title);
+    rendered_project = rendered_project.replace("{{project.emoji}}", &project.emoji);
+    rendered_project = rendered_project.replace("{{project.website}}", &project.website);
+    rendered_project = rendered_project.replace("{{project.description}}", &project.description);
+    rendered_project = rendered_project.replace("{{project.news}}", &rendered_news);
+
+    rendered_project.trim().to_string()
+}
+
+fn render_news_md(news: &News, config: &Config) -> String {
     let user = format!(
         "[{}](https://matrix.to/#/{})",
         news.reporter_display_name, news.reporter_id
@@ -295,7 +315,7 @@ fn news_md(news: &News, config: &Config) -> String {
 
     let mut news_md = format!(
         "{} {}\n\n\
-        {}\n",
+        {}\n\n",
         user, verb, message
     );
 
@@ -309,7 +329,6 @@ fn news_md(news: &News, config: &Config) -> String {
         news_md += &(video.clone() + "\n");
     }
 
-    news_md += "\n";
     news_md
 }
 
