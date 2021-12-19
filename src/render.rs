@@ -1,6 +1,5 @@
 use chrono::Datelike;
 use matrix_sdk::RoomMember;
-use rand::Rng;
 use regex::Regex;
 use ruma::MxcUri;
 
@@ -311,7 +310,7 @@ fn render_news_md(news: &News, config: &Config) -> String {
         news.reporter_display_name, news.reporter_id
     );
 
-    let verb = random_verb();
+    let verb = &config.random_verb();
     let message = prepare_message(news.message());
 
     let mut news_md = format!(
@@ -355,13 +354,6 @@ fn prepare_message(msg: String) -> String {
 
     // lists
     msg.replace("> -", "> *")
-}
-
-fn random_verb() -> String {
-    let mut rng = rand::thread_rng();
-    let verbs = vec!["reports", "says", "announces"];
-    let id = rng.gen_range(0..verbs.len());
-    verbs[id].to_string()
 }
 
 fn message_link(config: &Config, event_id: &str) -> String {
