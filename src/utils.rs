@@ -1,13 +1,14 @@
 use async_process::{Command, Stdio};
 use matrix_sdk::room::Room;
+use matrix_sdk::ruma::api::client::r0::room::get_room_event::Request;
+use matrix_sdk::ruma::events::room::message::{
+    MessageType, Relation, Replacement, RoomMessageEventContent, SyncRoomMessageEvent,
+    TextMessageEventContent,
+};
+use matrix_sdk::ruma::events::{AnyMessageEvent, AnyRoomEvent, MessageEvent};
+use matrix_sdk::ruma::{EventId, UserId};
 use matrix_sdk::{BaseRoomMember, RoomMember};
 use regex::Regex;
-use ruma::api::client::r0::room::get_room_event::Request;
-use ruma::events::room::message::{
-    MessageEventContent, MessageType, Relation, Replacement, TextMessageEventContent,
-};
-use ruma::events::{AnyMessageEvent, AnyRoomEvent, MessageEvent, SyncMessageEvent};
-use ruma::{EventId, UserId};
 
 use std::env;
 use std::fs::File;
@@ -24,7 +25,7 @@ pub fn news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) -> Opti
     // * message
     if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(MessageEvent {
         content:
-            MessageEventContent {
+            RoomMessageEventContent {
                 msgtype: MessageType::Text(c),
                 ..
             },
@@ -59,7 +60,7 @@ pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyRoom
 
 pub async fn message_type(room_event: &AnyRoomEvent) -> Option<MessageType> {
     if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(MessageEvent {
-        content: MessageEventContent {
+        content: RoomMessageEventContent {
             msgtype: msg_type, ..
         },
         ..
@@ -72,16 +73,12 @@ pub async fn message_type(room_event: &AnyRoomEvent) -> Option<MessageType> {
 }
 
 /// A simplified way of getting the text from a message event
-pub fn get_message_event_text(event: &SyncMessageEvent<MessageEventContent>) -> Option<String> {
-    if let SyncMessageEvent {
-        content:
-            MessageEventContent {
-                msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
-                relates_to: None,
-                ..
-            },
+pub fn get_message_event_text(event: &SyncRoomMessageEvent) -> Option<String> {
+    if let RoomMessageEventContent {
+        msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
+        relates_to: None,
         ..
-    } = event
+    } = &event.content
     {
         return Some(msg_body.to_owned());
     }
@@ -89,28 +86,14 @@ pub fn get_message_event_text(event: &SyncMessageEvent<MessageEventContent>) -> 
 }
 
 /// A simplified way of getting an edited message
-pub fn get_edited_message_event_text(
-    event: &SyncMessageEvent<MessageEventContent>,
-) -> Option<(EventId, String)> {
-    if let SyncMessageEvent {
-        content:
-            MessageEventContent {
-                relates_to:
-                    Some(Relation::Replacement {
-                        0:
-                            Replacement {
-                                event_id,
-                                new_content,
-                                ..
-                            },
-                        ..
-                    }),
-                ..
-            },
+pub fn get_edited_message_event_text(event: &SyncRoomMessageEvent) -> Option<(EventId, String)> {
+    if let Some(Relation::Replacement(Replacement {
+        event_id,
+        new_content,
         ..
-    } = event
+    })) = &event.content.relates_to
     {
-        if let MessageEventContent {
+        if let RoomMessageEventContent {
             msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
             relates_to: None,
             ..
