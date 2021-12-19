@@ -40,7 +40,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
     let mut news_count = 0;
     let mut not_assigned = 0;
-    let mut report_text = String::new();
+    let mut rendered_report = String::new();
     let mut project_names: HashSet<String> = HashSet::new();
 
     let mut images: Vec<(String, MxcUri)> = Vec::new();
@@ -48,14 +48,6 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
     let mut warnings: Vec<String> = Vec::new();
     let mut notes: Vec<String> = Vec::new();
-
-    // Load templates for rendering
-    let mut report_template =
-        utils::template_from_env("REPORT_TEMPLATE_PATH", "./report_template.md");
-    let section_template =
-        utils::template_from_env("SECTION_TEMPLATE_PATH", "./section_template.md");
-    let project_template =
-        utils::template_from_env("PROJECT_TEMPLATE_PATH", "./project_template.md");
 
     // Sort news entries into `RenderProject`s (`render_projects`)
     for news in news_list {
@@ -194,47 +186,11 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
     // Do the actual markdown rendering
     for (_, render_section) in render_sections {
-        let section = render_section.section;
-        let mut section_local;
-
-        // Create section header
-        section_local = section_template.replace("{{section.title}}", &section.title);
-        section_local = section_local.replace("{{section.emoji}}", &section.emoji);
-
-        // First iterate over news without project information
-        let mut section_text = String::new(); // Holding string
-        for news in render_section.news {
-            section_text += &news_md(&news, &config);
-        }
-        section_local = section_local.replace("{{section.news}}", &section_text);
-
-        // Then iterate over projects
-        let mut project_text = String::new();
-        for render_project in render_section.projects {
-            let project = render_project.project;
-            let mut project_local;
-
-            // Create project header
-            project_local = project_template.replace("{{project.title}}", &project.title);
-            project_local = project_local.replace("{{project.emoji}}", &project.emoji);
-            project_local = project_local.replace("{{project.website}}", &project.website);
-            project_local = project_local.replace("{{project.description}}", &project.description);
-
-            // Iterate over project news items
-            let mut project_item = String::new();
-            for news in render_project.news {
-                project_item += &news_md(&news, &config);
-            }
-            project_local = project_local.replace("{{project.news}}", &project_item);
-
-            project_text += &project_local;
-        }
-        section_local = section_local.replace("{{section.projects}}", &project_text);
-
-        report_text += &section_local;
+        let rendered_section = render_section_md(&render_section, &config);
+        rendered_report += &format!("{}\n\n", rendered_section);
     }
 
-    // Create summary notes
+    // Create summary notes for the admin room
     if not_assigned != 0 {
         let note = format!(
             "{} news are not included because of project/section assignment is missing. Use !status command to list them.",
@@ -250,6 +206,10 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
         videos.len(),
     );
     notes.insert(0, summary);
+
+    // Rerverse order to make it more easy to read
+    warnings.reverse();
+    notes.reverse();
 
     // Replace template variables with content
     let display_name = utils::get_member_display_name(editor);
@@ -270,20 +230,21 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     projects = projects.replace("{", "");
     projects = projects.replace("}", "");
 
-    // Render sections/projects first so those templates can use variables
-    report_template = report_template.replace("{{sections}}", report_text.trim());
-    report_template = report_template.replace("{{weeknumber}}", &weeknumber);
-    report_template = report_template.replace("{{timespan}}", &timespan);
-    report_template = report_template.replace("{{projects}}", &projects);
-    report_template = report_template.replace("{{today}}", &today);
-    report_template = report_template.replace("{{author}}", &display_name);
+    // Load the section template
+    let env_name = "REPORT_TEMPLATE_PATH";
+    let fallback = "./report_template.md";
+    let mut rendered = utils::template_from_env(env_name, fallback);
 
-    // Rerverse order to make it more easy to read
-    warnings.reverse();
-    notes.reverse();
+    // Replace the template variables with values
+    rendered = rendered.replace("{{sections}}", rendered_report.trim());
+    rendered = rendered.replace("{{weeknumber}}", &weeknumber);
+    rendered = rendered.replace("{{timespan}}", &timespan);
+    rendered = rendered.replace("{{projects}}", &projects);
+    rendered = rendered.replace("{{today}}", &today);
+    rendered = rendered.replace("{{author}}", &display_name);
 
     RenderResult {
-        rendered: report_template,
+        rendered,
         warnings,
         notes,
         images,
@@ -291,7 +252,60 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     }
 }
 
-fn news_md(news: &News, config: &Config) -> String {
+fn render_section_md(render_section: &RenderSection, config: &Config) -> String {
+    // Load the section template
+    let env_name = "SECTION_TEMPLATE_PATH";
+    let fallback = "./section_template.md";
+    let mut rendered_section = utils::template_from_env(env_name, fallback);
+
+    // First iterate over news without project information
+    let mut rendered_news = String::new();
+    for news in &render_section.news {
+        rendered_news += &render_news_md(&news, &config);
+    }
+    rendered_news = rendered_news.trim().to_string();
+
+    // Then iterate over projects
+    let mut rendered_projects = String::new();
+    for render_project in &render_section.projects {
+        rendered_projects += &render_project_md(render_project, &config);
+    }
+
+    // Replace the template variables with values
+    let section = &render_section.section;
+    rendered_section = rendered_section.replace("{{section.title}}", &section.title);
+    rendered_section = rendered_section.replace("{{section.emoji}}", &section.emoji);
+    rendered_section = rendered_section.replace("{{section.news}}", &rendered_news);
+    rendered_section = rendered_section.replace("{{section.projects}}", &rendered_projects);
+
+    rendered_section.trim().to_string()
+}
+
+fn render_project_md(render_project: &RenderProject, config: &Config) -> String {
+    // Load the project template
+    let env_name = "PROJECT_TEMPLATE_PATH";
+    let fallback = "./project_template.md";
+    let mut rendered_project = utils::template_from_env(env_name, fallback);
+
+    // Iterate over project news items
+    let mut rendered_news = String::new();
+    for news in &render_project.news {
+        rendered_news += &render_news_md(&news, &config);
+    }
+    rendered_news = rendered_news.trim().to_string();
+
+    // Replace the template variables with values
+    let project = &render_project.project;
+    rendered_project = rendered_project.replace("{{project.title}}", &project.title);
+    rendered_project = rendered_project.replace("{{project.emoji}}", &project.emoji);
+    rendered_project = rendered_project.replace("{{project.website}}", &project.website);
+    rendered_project = rendered_project.replace("{{project.description}}", &project.description);
+    rendered_project = rendered_project.replace("{{project.news}}", &rendered_news);
+
+    rendered_project.trim().to_string()
+}
+
+fn render_news_md(news: &News, config: &Config) -> String {
     let user = format!(
         "[{}](https://matrix.to/#/{})",
         news.reporter_display_name, news.reporter_id
@@ -302,7 +316,7 @@ fn news_md(news: &News, config: &Config) -> String {
 
     let mut news_md = format!(
         "{} {}\n\n\
-        {}\n",
+        {}\n\n",
         user, verb, message
     );
 
@@ -316,7 +330,6 @@ fn news_md(news: &News, config: &Config) -> String {
         news_md += &(video.clone() + "\n");
     }
 
-    news_md += "\n";
     news_md
 }
 

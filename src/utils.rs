@@ -200,5 +200,6 @@ pub fn template_from_env(env_var_name: &str, fallback: &str) -> String {
     let mut template = String::new();
     file.read_to_string(&mut template)
         .expect("Unable to read template file");
+
     template
 }

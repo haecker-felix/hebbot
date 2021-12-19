@@ -3,7 +3,9 @@
 .buildconfig
 ./config.json
 ./config.toml
+/config.toml
 ./store.json
+/store.json
 backup.json
 *.json~
 start-ra.sh
