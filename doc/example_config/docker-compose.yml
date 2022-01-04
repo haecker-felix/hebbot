@@ -9,7 +9,7 @@ services:
       - CONFIG_PATH=/data/config.toml
       - REPORT_TEMPLATE_PATH=/data/report_template.md
       - SECTION_TEMPLATE_PATH=/data/section_template.md
-      - PROJECT_TEMPLATE=/data/project_template.md
+      - PROJECT_TEMPLATE_PATH=/data/project_template.md
       - STORE_PATH=/data/store.json
 
 volumes:
