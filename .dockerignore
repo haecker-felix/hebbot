@@ -7,3 +7,9 @@ backup.json
 template.md
 config.json.example
 template.md.example
+/doc
+./doc
+/github
+./github
+/cargo-home
+./cargo-home
