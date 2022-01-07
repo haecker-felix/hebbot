@@ -95,7 +95,7 @@ pub fn get_edited_message_event_text(event: &SyncRoomMessageEvent) -> Option<(Ev
     {
         if let RoomMessageEventContent {
             msgtype: MessageType::Text(TextMessageEventContent { body: msg_body, .. }),
-            relates_to: None,
+            relates_to: _,
             ..
         } = &**new_content
         {
