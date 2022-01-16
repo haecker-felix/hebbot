@@ -111,8 +111,7 @@ impl Config {
         let mut notes = Vec::new();
 
         // Check if something is missing / empty
-        if config.notice_emoji.is_empty()
-        {
+        if config.notice_emoji.is_empty() {
             warnings.insert(
                 0,
                 "At least one emoji isn’t configured. The bot will not work properly.".to_string(),

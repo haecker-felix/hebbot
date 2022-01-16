@@ -401,7 +401,7 @@ impl Bot {
                         } else {
                             Some(format!(
                                 "❌ Unable to add {}’s message as news, invalid event/message type [{}]",
-                                related_event.sender().to_string(),
+                                related_event.sender(),
                                 link,
                             ))
                         }
@@ -420,7 +420,7 @@ impl Bot {
                                 news.add_section_name(reaction_event_id, section.name);
                                 Some(format!(
                                     "✅ Editor {} added {}’s news entry [{}] to the “{}” section.",
-                                    reaction_sender.user_id().to_string(),
+                                    reaction_sender.user_id(),
                                     news.reporter_id,
                                     link,
                                     section.title
@@ -431,7 +431,7 @@ impl Bot {
                                 news.add_project_name(reaction_event_id, project.name);
                                 Some(format!(
                                     "✅ Editor {} added the project description “{}” to {}’s news entry [{}].",
-                                    reaction_sender.user_id().to_string(),
+                                    reaction_sender.user_id(),
                                     project.title,
                                     news.reporter_id,
                                     link
@@ -442,7 +442,7 @@ impl Bot {
                     } else {
                         Some(format!(
                             "❌ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
-                            reaction_sender.user_id().to_string(),
+                            reaction_sender.user_id(),
                             reaction_type,
                             link,
                             related_event_id
@@ -485,7 +485,7 @@ impl Bot {
                     _ => Some(format!(
                         "❌ Invalid reaction emoji {} by {} for message type image [{}].",
                         reaction_emoji,
-                        reaction_sender.user_id().to_string(),
+                        reaction_sender.user_id(),
                         link
                     )),
                 },
@@ -523,7 +523,7 @@ impl Bot {
                     }
                     _ => Some(format!(
                         "❌ Invalid reaction emoji by {} for message type video [{}].",
-                        reaction_sender.user_id().to_string(),
+                        reaction_sender.user_id(),
                         link
                     )),
                 },
@@ -564,7 +564,7 @@ impl Bot {
                 Some(format!(
                     "✅ {}’s news entry got deleted by {}",
                     news.reporter_id,
-                    member.user_id().to_string()
+                    member.user_id()
                 ))
             // For all other redactions, there is no point in checking them if the member is not an editor.
             } else if !is_editor {
@@ -575,7 +575,7 @@ impl Bot {
                 if reaction_type != ReactionType::None {
                     Some(format!(
                         "✅ Editor {} removed {} from {}’s news entry ({}).",
-                        member.user_id().to_string(),
+                        member.user_id(),
                         reaction_type,
                         news.reporter_id,
                         link
@@ -803,7 +803,7 @@ impl Bot {
                 if uri.is_valid() {
                     let url = format!(
                         "{}_matrix/media/r0/download/{}/{}",
-                        self.client.homeserver().await.to_string(),
+                        self.client.homeserver().await,
                         uri.server_name().unwrap(),
                         uri.media_id().unwrap()
                     );
