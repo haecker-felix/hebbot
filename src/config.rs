@@ -11,9 +11,7 @@ pub struct Config {
     pub reporting_room_id: String,
     pub admin_room_id: String,
     pub notice_emoji: String,
-    pub image_emoji: String,
     pub image_markdown: String,
-    pub video_emoji: String,
     pub video_markdown: String,
     pub verbs: Vec<String>,
     pub update_config_command: String,
@@ -54,11 +52,7 @@ impl Config {
     }
 
     pub fn reaction_type_by_emoji(&self, emoji: &str) -> ReactionType {
-        if utils::emoji_cmp(&self.image_emoji, emoji) {
-            return ReactionType::Image;
-        } else if utils::emoji_cmp(&self.video_emoji, emoji) {
-            return ReactionType::Video;
-        } else if utils::emoji_cmp(&self.notice_emoji, emoji) {
+        if utils::emoji_cmp(&self.notice_emoji, emoji) {
             return ReactionType::Notice;
         } else {
             // section
@@ -118,8 +112,6 @@ impl Config {
 
         // Check if something is missing / empty
         if config.notice_emoji.is_empty()
-            || config.image_emoji.is_empty()
-            || config.video_emoji.is_empty()
         {
             warnings.insert(
                 0,
