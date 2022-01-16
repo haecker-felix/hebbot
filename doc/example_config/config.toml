@@ -3,9 +3,7 @@ bot_user_id = '@botname:domain.org'
 reporting_room_id = '!roomid:domain.org'
 admin_room_id = '!adminroomid:domain.org'
 notice_emoji = '⭕'
-image_emoji = '📷️'
 image_markdown = '> ![]({{file}})'
-video_emoji = '📹️'
 video_markdown = '> {{< video src="{{file}}" >}}'
 verbs = ["reports", "says", "announces"]
 update_config_command = "sh /data/update_config.sh"
