@@ -165,10 +165,14 @@ impl Bot {
             ReactionEventContent::new(Relation::new(msg_event_id.clone(), reaction.to_string()));
         let txn_id = Uuid::new_v4();
 
-        self.reporting_room
-            .send(content, Some(txn_id))
-            .await
-            .expect("Unable to send reaction");
+        if let Err(err) = self.reporting_room.send(content, Some(txn_id)).await {
+            warn!(
+                "Could not send {} reaction to msg {}: {}",
+                reaction,
+                msg_event_id,
+                err.to_string()
+            );
+        }
     }
 
     /// Simplified method for sending a file
