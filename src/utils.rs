@@ -17,7 +17,7 @@ use std::io::Read;
 use crate::News;
 
 /// Try to convert a `AnyRoomEvent` into a `News`
-pub fn news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) -> Option<News> {
+pub fn create_news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) -> Option<News> {
     // Fetch related event's
     // * event_id
     // * reporter_id

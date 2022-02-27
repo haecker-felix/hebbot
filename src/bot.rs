@@ -393,8 +393,9 @@ impl Bot {
                             .await
                             .unwrap()
                             .unwrap();
+
                         if let Some(news) =
-                            utils::news_by_event(related_event, &related_event_sender)
+                            utils::create_news_by_event(related_event, &related_event_sender)
                         {
                             self.add_news(news, false).await;
                             None
@@ -893,6 +894,25 @@ impl Bot {
     }
 
     async fn add_news(&self, news: News, notify_reporter: bool) {
+        let link = self.message_link(news.event_id.to_string());
+
+        // Check if the news already exists
+        if self
+            .news_store
+            .lock()
+            .unwrap()
+            .news_by_message_id(&news.event_id)
+            .is_some()
+        {
+            let msg = format!(
+                "⚠️ Cannot resubmit a news item that has already been added. [{}]",
+                link
+            );
+            self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+                .await;
+            return;
+        }
+
         // Check min message length
         if news.message().len() > 30 {
             if notify_reporter {
@@ -904,7 +924,6 @@ impl Bot {
                     .await;
             }
 
-            let link = self.message_link(news.event_id.to_string());
             let msg = format!("✅ {} submitted a news entry. [{}]", news.reporter_id, link);
             self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
                 .await;
