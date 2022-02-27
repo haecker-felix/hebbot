@@ -195,7 +195,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
             "{} news are not included because of project/section assignment is missing. Use !status command to list them.",
             not_assigned
         );
-        notes.insert(0, note);
+        warnings.insert(0, note);
     }
 
     let summary = format!(
