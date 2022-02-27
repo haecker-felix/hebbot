@@ -2,9 +2,8 @@
 Two Matrix rooms are required to use this bot.
 
 #### "Reporting" room
-This room is open to everyone. Here people can share news any time. Editors can mark messages, but also images and videos with emoji reactions here. For example...
-- ⭕: Approve a message (to include it in the rendered markdown)
-- 📷️: Add image. The image will then be automatically added to the corresponding news message, and inserted in the rendered markdown. 
+This room is open to everyone. Here people can share news any time. Editors can mark messages, but also images and videos with emoji reactions here. Use
+- ⭕: Approve a message (to include it in the rendered markdown), or add an image/video to a previously reported item. The image/video will then be automatically added to the corresponding news message, and inserted in the rendered markdown. 
 - 🛰️: Add message to the third-party section
 
 Those emojis are just an example, you can configure them as you want in the `config.toml` file. 

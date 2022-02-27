@@ -437,20 +437,6 @@ impl Bot {
                                     link
                                 ))
                             }
-                            ReactionType::Image => {
-                                Some(format!(
-                                    "❌ It’s not possible to save {}’s news entry as image (only image messages are supported) [{}].",
-                                    news.reporter_id,
-                                    link
-                                ))
-                            }
-                            ReactionType::Video => {
-                                Some(format!(
-                                    "❌ It’s not possible to save {}’s news entry as video (only video messages are supported) [{}].",
-                                    news.reporter_id,
-                                    link
-                                ))
-                            }
                             _ => None,
                         }
                     } else {
@@ -467,7 +453,7 @@ impl Bot {
 
                 // Check if related message is an image
                 MessageType::Image(image) => match reaction_type {
-                    ReactionType::Image => {
+                    ReactionType::Notice => {
                         let reporter_id = reaction_sender.user_id().to_string();
                         let news_store = self.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
@@ -506,7 +492,7 @@ impl Bot {
 
                 // Check if related message is a video
                 MessageType::Video(video) => match reaction_type {
-                    ReactionType::Video => {
+                    ReactionType::Notice => {
                         let reporter_id = reaction_sender.user_id().to_string();
                         let news_store = self.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
@@ -720,8 +706,6 @@ impl Bot {
             match result_reaction {
                 ReactionType::Section(section) => section.unwrap().html_details(),
                 ReactionType::Project(project) => project.unwrap().html_details(),
-                ReactionType::Image => format!("{} is configured as image emoji.", term),
-                ReactionType::Video => format!("{} is configured as video emoji.", term),
                 ReactionType::None => format!("❌ Unable to find details for ”{}”.", term),
                 ReactionType::Notice => format!("{} is configured as notice emoji", term),
             }

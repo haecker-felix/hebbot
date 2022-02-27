@@ -132,10 +132,6 @@ impl News {
             ReactionType::Section(None)
         } else if self.project_names.borrow_mut().remove(event_id).is_some() {
             ReactionType::Project(None)
-        } else if self.images.borrow_mut().remove(event_id).is_some() {
-            ReactionType::Image
-        } else if self.videos.borrow_mut().remove(event_id).is_some() {
-            ReactionType::Video
         } else {
             ReactionType::None
         }
