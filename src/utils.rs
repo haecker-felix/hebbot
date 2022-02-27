@@ -2,8 +2,8 @@ use async_process::{Command, Stdio};
 use matrix_sdk::room::Room;
 use matrix_sdk::ruma::api::client::r0::room::get_room_event::Request;
 use matrix_sdk::ruma::events::room::message::{
-    MessageType, Relation, Replacement, RoomMessageEventContent, SyncRoomMessageEvent,
-    TextMessageEventContent,
+    MessageType, NoticeMessageEventContent, Relation, Replacement, RoomMessageEventContent,
+    SyncRoomMessageEvent, TextMessageEventContent,
 };
 use matrix_sdk::ruma::events::{AnyMessageEvent, AnyRoomEvent, MessageEvent};
 use matrix_sdk::ruma::{EventId, UserId};
@@ -26,7 +26,9 @@ pub fn create_news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) 
     if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(MessageEvent {
         content:
             RoomMessageEventContent {
-                msgtype: MessageType::Text(c),
+                msgtype:
+                    MessageType::Text(TextMessageEventContent { body, .. })
+                    | MessageType::Notice(NoticeMessageEventContent { body, .. }),
                 ..
             },
         sender,
@@ -35,7 +37,7 @@ pub fn create_news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) 
     {
         let reporter_id = sender.to_string();
         let reporter_display_name = get_member_display_name(member);
-        let message = c.body.clone();
+        let message = body.clone();
 
         let news = News::new(
             any_room_event.event_id().clone().to_string(),

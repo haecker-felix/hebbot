@@ -387,7 +387,7 @@ impl Bot {
             }
 
             let msg = match related_message_type {
-                MessageType::Text(_) => {
+                MessageType::Text(_) | MessageType::Notice(_) => {
                     // Check if the reaction == notice emoji,
                     // Yes -> Try to add the message as news submission
                     let msg = if utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji) {
