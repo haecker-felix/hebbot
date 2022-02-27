@@ -23,7 +23,7 @@ usual_reporters = ['@user1:domain.io']
 emoji = '🛰️'
 name = 'third-party'
 title = 'Third Party Projects'
-order = 100
+order = 200
 usual_reporters = []
 
 [[projects]]

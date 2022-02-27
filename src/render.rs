@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use crate::{utils, Config, News, Project, Section};
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 struct RenderProject {
     pub project: Project,
     pub news: Vec<News>,
@@ -16,7 +16,7 @@ struct RenderProject {
     pub overwritten_section: Option<String>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 struct RenderSection {
     pub section: Section,
     pub projects: Vec<RenderProject>,
@@ -167,7 +167,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
         let map_section_name = format!("{}-{}", section.order, section_name);
 
         match render_sections.get_mut(&map_section_name) {
-            // RenderSection already exists -> default_sectionAdd render_project entry to it
+            // RenderSection already exists -> default_section Add render_project entry to it
             Some(render_section) => {
                 render_section.projects.insert(0, render_project);
             }
@@ -183,8 +183,14 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
         }
     }
 
+    // Sort sections
+    let mut sorted_render_sections: BTreeMap<Section, RenderSection> = BTreeMap::new();
+    for render_section in render_sections.values() {
+        sorted_render_sections.insert(render_section.section.clone(), render_section.clone());
+    }
+
     // Do the actual markdown rendering
-    for (_, render_section) in render_sections {
+    for (_, render_section) in sorted_render_sections {
         let rendered_section = render_section_md(&render_section, &config);
         rendered_report += &format!("{}\n\n", rendered_section);
     }

@@ -37,3 +37,9 @@ impl PartialOrd for Section {
         Some(self.order.cmp(&other.order))
     }
 }
+
+impl Ord for Section {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.order.cmp(&other.order)
+    }
+}
