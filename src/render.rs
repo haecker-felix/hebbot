@@ -267,8 +267,9 @@ fn render_section_md(render_section: &RenderSection, config: &Config) -> String 
     // Then iterate over projects
     let mut rendered_projects = String::new();
     for render_project in &render_section.projects {
-        rendered_projects += &render_project_md(render_project, config);
+        rendered_projects += &("\n\n".to_owned() + &render_project_md(render_project, config));
     }
+    let rendered_projects = rendered_projects.trim().to_string();
 
     // Replace the template variables with values
     let section = &render_section.section;
@@ -315,7 +316,7 @@ fn render_news_md(news: &News, config: &Config) -> String {
 
     let mut news_md = format!(
         "{} {}\n\n\
-        {}\n\n",
+        {}\n",
         user, verb, message
     );
 
@@ -329,6 +330,7 @@ fn render_news_md(news: &News, config: &Config) -> String {
         news_md += &(video.clone() + "\n");
     }
 
+    news_md += "\n";
     news_md
 }
 
