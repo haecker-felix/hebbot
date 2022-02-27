@@ -226,8 +226,8 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
     // Projects list (can be get used for hugo tags for example)
     let mut projects = format!("{:?}", &project_names);
-    projects = projects.replace("{", "");
-    projects = projects.replace("}", "");
+    projects = projects.replace('{', "");
+    projects = projects.replace('}', "");
 
     // Load the section template
     let env_name = "REPORT_TEMPLATE_PATH";
@@ -350,7 +350,7 @@ fn prepare_message(msg: String) -> String {
 
     // quote message
     let msg = format!("> {}", msg);
-    let msg = msg.replace("\n", "\n> ");
+    let msg = msg.replace('\n', "\n> ");
 
     // lists
     msg.replace("> -", "> *")
