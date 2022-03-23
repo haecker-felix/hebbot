@@ -919,12 +919,12 @@ impl Bot {
 
         // Check min message length
         if news.message().len() > 30 {
-            if notify_reporter {
-                let msg = format!(
-                    "✅ Thanks for the report {}, I'll store your update!",
-                    news.reporter_display_name
-                );
-                self.send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
+            if notify_reporter && !self.config.ack_text.is_empty() {
+                let msg = &self
+                    .config
+                    .ack_text
+                    .replace("{{user}}", &news.reporter_display_name);
+                self.send_message(msg, BotMsgType::ReportingRoomPlainNotice)
                     .await;
             }
 
