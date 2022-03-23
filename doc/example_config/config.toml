@@ -6,6 +6,7 @@ notice_emoji = '⭕'
 image_markdown = '> ![]({{file}})'
 video_markdown = '> {{< video src="{{file}}" >}}'
 verbs = ["reports", "says", "announces"]
+min_length = 30
 update_config_command = "sh /data/update_config.sh"
 editors = [
     '@user1:domain.io',
