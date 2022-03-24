@@ -11,6 +11,7 @@ pub struct Config {
     pub reporting_room_id: String,
     pub admin_room_id: String,
     pub notice_emoji: String,
+    pub ack_emoji: String,
     pub image_markdown: String,
     pub video_markdown: String,
     pub verbs: Vec<String>,

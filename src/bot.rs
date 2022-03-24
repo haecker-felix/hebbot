@@ -919,6 +919,14 @@ impl Bot {
 
         // Check min message length
         if news.message().len() > 30 {
+            // React with ack_emoji if configured
+            if !self.config.ack_emoji.is_empty() {
+                self.send_reaction(
+                    &self.config.ack_emoji,
+                    &EventId::try_from(news.event_id.as_str()).unwrap(),
+                )
+                .await;
+            }
             if notify_reporter {
                 let msg = format!(
                     "✅ Thanks for the report {}, I'll store your update!",

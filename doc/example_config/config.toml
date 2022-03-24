@@ -3,6 +3,7 @@ bot_user_id = '@botname:domain.org'
 reporting_room_id = '!roomid:domain.org'
 admin_room_id = '!adminroomid:domain.org'
 notice_emoji = '⭕'
+ack_emoji = '✅'   # set to '' to disable
 image_markdown = '> ![]({{file}})'
 video_markdown = '> {{< video src="{{file}}" >}}'
 verbs = ["reports", "says", "announces"]
