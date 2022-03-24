@@ -287,9 +287,11 @@ impl Bot {
         member: &RoomMember,
         event_id: &EventId,
     ) {
-        // We're going to ignore all messages, expect it mentions the bot at the beginning
+        // We're going to ignore all messages, except if it mentions the bot at
+        // the beginning by name or id
         let bot_id = self.client.user_id().await.unwrap();
-        if !utils::msg_starts_with_mention(bot_id, message.clone()) {
+        let display_name = self.client.display_name().await.unwrap();
+        if !utils::msg_starts_with_mention(bot_id, display_name, message.clone()) {
             return;
         }
 
@@ -316,7 +318,8 @@ impl Bot {
     ) {
         let event_id = edited_msg_event_id.to_string();
         let bot = self.client.user_id().await.unwrap();
-        let updated_message = utils::remove_bot_name(&updated_message, &bot);
+        let display_name = self.client.display_name().await.unwrap();
+        let updated_message = utils::remove_bot_name(&updated_message, &bot, display_name);
         let link = self.message_link(edited_msg_event_id.to_string());
 
         let message = {
@@ -934,7 +937,12 @@ impl Bot {
 
             // remove bot name from message
             let bot_id = self.client.user_id().await.unwrap();
-            news.set_message(utils::remove_bot_name(&news.message(), &bot_id));
+            let display_name = self.client.display_name().await.unwrap();
+            news.set_message(utils::remove_bot_name(
+                &news.message(),
+                &bot_id,
+                display_name,
+            ));
 
             // Pre-populate with emojis to facilitate the editor's work
             for project in self.config.projects_by_usual_reporter(&news.reporter_id) {
