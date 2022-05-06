@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use matrix_sdk::ruma::MxcUri;
+use matrix_sdk::ruma::OwnedMxcUri;
 use serde::{Deserialize, Serialize};
 
 use std::cell::RefCell;
@@ -17,8 +17,8 @@ pub struct News {
     message: RefCell<String>,
     section_names: RefCell<HashMap<String, String>>,
     project_names: RefCell<HashMap<String, String>>,
-    images: RefCell<HashMap<String, (String, MxcUri)>>,
-    videos: RefCell<HashMap<String, (String, MxcUri)>>,
+    images: RefCell<HashMap<String, (String, OwnedMxcUri)>>,
+    videos: RefCell<HashMap<String, (String, OwnedMxcUri)>>,
 }
 
 impl News {
@@ -83,27 +83,27 @@ impl News {
         self.project_names.borrow_mut().insert(event_id, emoji);
     }
 
-    pub fn images(&self) -> Vec<(String, MxcUri)> {
+    pub fn images(&self) -> Vec<(String, OwnedMxcUri)> {
         Self::files(&*self.images.borrow())
     }
 
-    pub fn add_image(&self, event_id: String, filename: String, mxc_uri: MxcUri) {
+    pub fn add_image(&self, event_id: String, filename: String, mxc_uri: OwnedMxcUri) {
         self.images
             .borrow_mut()
             .insert(event_id, (filename, mxc_uri));
     }
 
-    pub fn videos(&self) -> Vec<(String, MxcUri)> {
+    pub fn videos(&self) -> Vec<(String, OwnedMxcUri)> {
         Self::files(&*self.videos.borrow())
     }
 
-    pub fn add_video(&self, event_id: String, filename: String, mxc_uri: MxcUri) {
+    pub fn add_video(&self, event_id: String, filename: String, mxc_uri: OwnedMxcUri) {
         self.videos
             .borrow_mut()
             .insert(event_id, (filename, mxc_uri));
     }
 
-    fn files(files: &HashMap<String, (String, MxcUri)>) -> Vec<(String, MxcUri)> {
+    fn files(files: &HashMap<String, (String, OwnedMxcUri)>) -> Vec<(String, OwnedMxcUri)> {
         let mut images_map = HashMap::new();
         let mut images = Vec::new();
 

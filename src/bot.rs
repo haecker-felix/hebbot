@@ -2,16 +2,18 @@ use chrono::{DateTime, Utc};
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::event_handler::Ctx;
 use matrix_sdk::room::{Joined, Room};
-use matrix_sdk::ruma::events::reaction::{ReactionEventContent, Relation, SyncReactionEvent};
+use matrix_sdk::ruma::events::reaction::{
+    OriginalSyncReactionEvent, ReactionEventContent, Relation,
+};
 use matrix_sdk::ruma::events::room::message::{
-    FileMessageEventContent, MessageType, RoomMessageEventContent, SyncRoomMessageEvent,
+    FileMessageEventContent, MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent,
 };
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
+use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::AnyRoomEvent;
-use matrix_sdk::ruma::{EventId, MxcUri, RoomId, UserId};
+use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, UserId};
 use matrix_sdk::{Client, RoomMember};
 
-use std::convert::TryFrom;
 use std::env;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
@@ -37,14 +39,14 @@ impl Bot {
         let username = config.bot_user_id.as_str();
         let password = env::var("BOT_PASSWORD").expect("BOT_PASSWORD env variable not specified");
 
-        let user = UserId::try_from(username).expect("Unable to parse bot user id");
-        let client = Client::new_from_user_id(&user).await.unwrap();
+        let user = UserId::parse(username).expect("Unable to parse bot user id");
+        let client = Client::builder().user_id(&user).build().await.unwrap();
 
         Self::login(&client, user.localpart(), &password).await;
 
         // Get matrix rooms IDs
-        let reporting_room_id = RoomId::try_from(config.reporting_room_id.as_str()).unwrap();
-        let admin_room_id = RoomId::try_from(config.admin_room_id.as_str()).unwrap();
+        let reporting_room_id = RoomId::parse(config.reporting_room_id.as_str()).unwrap();
+        let admin_room_id = RoomId::parse(config.admin_room_id.as_str()).unwrap();
 
         // Try to accept reporting room invite, if any
         if let Some(invited_room) = client.get_invited_room(&reporting_room_id) {
@@ -159,7 +161,7 @@ impl Bot {
     /// Simplified method for sending a reaction emoji
     async fn send_reaction(&self, reaction: &str, msg_event_id: &EventId) {
         let content =
-            ReactionEventContent::new(Relation::new(msg_event_id.clone(), reaction.to_string()));
+            ReactionEventContent::new(Relation::new(msg_event_id.to_owned(), reaction.to_string()));
 
         if let Err(err) = self.reporting_room.send(content, None).await {
             warn!(
@@ -172,7 +174,7 @@ impl Bot {
     }
 
     /// Simplified method for sending a file
-    async fn send_file(&self, url: MxcUri, filename: String, admin_room: bool) {
+    async fn send_file(&self, url: OwnedMxcUri, filename: String, admin_room: bool) {
         debug!("Send file (url: {:?}, admin-room: {:?})", url, admin_room);
 
         let file_content = FileMessageEventContent::plain(filename, url, None);
@@ -189,7 +191,7 @@ impl Bot {
     }
 
     /// Handling room messages events
-    async fn on_room_message(event: SyncRoomMessageEvent, room: Room, Ctx(bot): Ctx<Bot>) {
+    async fn on_room_message(event: OriginalSyncRoomMessageEvent, room: Room, Ctx(bot): Ctx<Bot>) {
         if let Room::Joined(_joined) = &room {
             // Standard text message
             if let Some(text) = utils::get_message_event_text(&event) {
@@ -220,13 +222,13 @@ impl Bot {
     }
 
     /// Handling room reaction events
-    async fn on_room_reaction(event: SyncReactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
+    async fn on_room_reaction(event: OriginalSyncReactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
         if let Room::Joined(_joined) = &room {
             let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
             let reaction_event_id = event.event_id.clone();
             let relation = &event.content.relates_to;
             let related_event_id = relation.event_id.clone();
-            let emoji = &relation.emoji.replace('\u{fe0f}', "");
+            let emoji = &relation.key.replace('\u{fe0f}', "");
 
             if let Some(related_event) = utils::room_event_by_id(&room, &related_event_id).await {
                 if let Some(related_msg_type) = utils::message_type(&related_event).await {
@@ -259,14 +261,18 @@ impl Bot {
 
     /// Handling room redaction events (= something got removed/reverted)
     async fn on_room_redaction(event: SyncRoomRedactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
-        if let Room::Joined(_joined) = &room {
-            let redacted_event_id = event.redacts.clone();
-            let member = room.get_member(&event.sender).await.unwrap().unwrap();
+        // FIXME: Function parameter should be OriginalSyncRoomRedactionEvent.
+        // Doesn't currently compile, needs a fix in the matrix-rust-sdk.
+        if let SyncRoomRedactionEvent::Original(event) = event {
+            if let Room::Joined(_joined) = &room {
+                let redacted_event_id = event.redacts.clone();
+                let member = room.get_member(&event.sender).await.unwrap().unwrap();
 
-            // Reporting room
-            if room.room_id() == bot.reporting_room.room_id() {
-                bot.on_reporting_room_redaction(&member, &redacted_event_id)
-                    .await;
+                // Reporting room
+                if room.room_id() == bot.reporting_room.room_id() {
+                    bot.on_reporting_room_redaction(&member, &redacted_event_id)
+                        .await;
+                }
             }
         }
     }
@@ -282,7 +288,7 @@ impl Bot {
     ) {
         // We're going to ignore all messages, expect it mentions the bot at the beginning
         let bot_id = self.client.user_id().await.unwrap();
-        if !utils::msg_starts_with_mention(bot_id, message.clone()) {
+        if !utils::msg_starts_with_mention(&bot_id, message.clone()) {
             return;
         }
 
@@ -291,7 +297,7 @@ impl Bot {
 
         // Create new news entry...
         let news = News::new(
-            event_id.clone().to_string(),
+            event_id.to_string(),
             reporter_id.clone(),
             reporter_display_name,
             message,
@@ -458,7 +464,7 @@ impl Bot {
                             related_event.sender().as_ref(),
                             &related_event_timestamp,
                         ) {
-                            if let Some(mxc_uri) = &image.url {
+                            if let MediaSource::Plain(mxc_uri) = &image.source {
                                 news.add_image(
                                     reaction_event_id,
                                     image.body.clone(),
@@ -497,7 +503,7 @@ impl Bot {
                             related_event.sender().as_ref(),
                             &related_event_timestamp,
                         ) {
-                            if let Some(mxc_uri) = &video.url {
+                            if let MediaSource::Plain(mxc_uri) = &video.source {
                                 news.add_video(
                                     reaction_event_id,
                                     video.body.clone(),
@@ -931,18 +937,12 @@ impl Bot {
 
             // Pre-populate with emojis to facilitate the editor's work
             for project in self.config.projects_by_usual_reporter(&news.reporter_id) {
-                self.send_reaction(
-                    &project.emoji,
-                    &EventId::try_from(news.event_id.as_str()).unwrap(),
-                )
-                .await;
+                self.send_reaction(&project.emoji, &EventId::parse(&news.event_id).unwrap())
+                    .await;
             }
             for section in self.config.sections_by_usual_reporter(&news.reporter_id) {
-                self.send_reaction(
-                    &section.emoji,
-                    &EventId::try_from(news.event_id.as_str()).unwrap(),
-                )
-                .await;
+                self.send_reaction(&section.emoji, &EventId::parse(&news.event_id).unwrap())
+                    .await;
             }
 
             // Save it in message store

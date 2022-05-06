@@ -1,5 +1,5 @@
 use chrono::Datelike;
-use matrix_sdk::ruma::MxcUri;
+use matrix_sdk::ruma::OwnedMxcUri;
 use matrix_sdk::RoomMember;
 use regex::Regex;
 
@@ -29,8 +29,8 @@ pub struct RenderResult {
     pub rendered: String,
     pub warnings: Vec<String>,
     pub notes: Vec<String>,
-    pub images: Vec<(String, MxcUri)>,
-    pub videos: Vec<(String, MxcUri)>,
+    pub images: Vec<(String, OwnedMxcUri)>,
+    pub videos: Vec<(String, OwnedMxcUri)>,
 }
 
 pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> RenderResult {
@@ -42,8 +42,8 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     let mut rendered_report = String::new();
     let mut project_names: HashSet<String> = HashSet::new();
 
-    let mut images: Vec<(String, MxcUri)> = Vec::new();
-    let mut videos: Vec<(String, MxcUri)> = Vec::new();
+    let mut images: Vec<(String, OwnedMxcUri)> = Vec::new();
+    let mut videos: Vec<(String, OwnedMxcUri)> = Vec::new();
 
     let mut warnings: Vec<String> = Vec::new();
     let mut notes: Vec<String> = Vec::new();

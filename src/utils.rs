@@ -1,12 +1,13 @@
 use async_process::{Command, Stdio};
 use matrix_sdk::room::Room;
-use matrix_sdk::ruma::api::client::r0::room::get_room_event::Request;
 use matrix_sdk::ruma::events::room::message::{
-    MessageType, NoticeMessageEventContent, Relation, RoomMessageEventContent,
-    SyncRoomMessageEvent, TextMessageEventContent,
+    MessageType, NoticeMessageEventContent, OriginalSyncRoomMessageEvent, Relation,
+    RoomMessageEventContent, TextMessageEventContent,
 };
-use matrix_sdk::ruma::events::{AnyMessageEvent, AnyRoomEvent, MessageEvent};
-use matrix_sdk::ruma::{EventId, UserId};
+use matrix_sdk::ruma::events::{
+    AnyMessageLikeEvent, AnyRoomEvent, MessageLikeEvent, OriginalMessageLikeEvent,
+};
+use matrix_sdk::ruma::{EventId, OwnedEventId, UserId};
 use matrix_sdk::{BaseRoomMember, RoomMember};
 use regex::Regex;
 
@@ -23,24 +24,26 @@ pub fn create_news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) 
     // * reporter_id
     // * reporter_display_name
     // * message
-    if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(MessageEvent {
-        content:
-            RoomMessageEventContent {
-                msgtype:
-                    MessageType::Text(TextMessageEventContent { body, .. })
-                    | MessageType::Notice(NoticeMessageEventContent { body, .. }),
-                ..
-            },
-        sender,
-        ..
-    })) = any_room_event
+    if let AnyRoomEvent::MessageLike(AnyMessageLikeEvent::RoomMessage(
+        MessageLikeEvent::Original(OriginalMessageLikeEvent {
+            content:
+                RoomMessageEventContent {
+                    msgtype:
+                        MessageType::Text(TextMessageEventContent { body, .. })
+                        | MessageType::Notice(NoticeMessageEventContent { body, .. }),
+                    ..
+                },
+            sender,
+            ..
+        }),
+    )) = any_room_event
     {
         let reporter_id = sender.to_string();
         let reporter_display_name = get_member_display_name(member);
         let message = body.clone();
 
         let news = News::new(
-            any_room_event.event_id().clone().to_string(),
+            any_room_event.event_id().to_string(),
             reporter_id,
             reporter_display_name,
             message,
@@ -54,14 +57,14 @@ pub fn create_news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) 
 
 /// Get room message by event id
 pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyRoomEvent> {
-    let request = Request::new(room.room_id(), event_id);
-    let event = room.event(request).await.ok()?.event.deserialize().ok()?;
-
-    Some(event)
+    room.event(event_id).await.ok()?.event.deserialize().ok()
 }
 
 pub async fn message_type(room_event: &AnyRoomEvent) -> Option<MessageType> {
-    if let AnyRoomEvent::Message(AnyMessageEvent::RoomMessage(ev)) = room_event {
+    if let AnyRoomEvent::MessageLike(AnyMessageLikeEvent::RoomMessage(
+        MessageLikeEvent::Original(ev),
+    )) = room_event
+    {
         Some(ev.content.msgtype.clone())
     } else {
         None
@@ -69,7 +72,7 @@ pub async fn message_type(room_event: &AnyRoomEvent) -> Option<MessageType> {
 }
 
 /// A simplified way of getting the text from a message event
-pub fn get_message_event_text(event: &SyncRoomMessageEvent) -> Option<String> {
+pub fn get_message_event_text(event: &OriginalSyncRoomMessageEvent) -> Option<String> {
     if let MessageType::Text(TextMessageEventContent { body, .. }) = &event.content.msgtype {
         Some(body.to_owned())
     } else {
@@ -78,7 +81,9 @@ pub fn get_message_event_text(event: &SyncRoomMessageEvent) -> Option<String> {
 }
 
 /// A simplified way of getting an edited message
-pub fn get_edited_message_event_text(event: &SyncRoomMessageEvent) -> Option<(EventId, String)> {
+pub fn get_edited_message_event_text(
+    event: &OriginalSyncRoomMessageEvent,
+) -> Option<(OwnedEventId, String)> {
     if let Some(Relation::Replacement(r)) = &event.content.relates_to {
         if let MessageType::Text(TextMessageEventContent { body, .. }) = &r.new_content.msgtype {
             return Some((r.event_id.clone(), body.to_owned()));
@@ -99,7 +104,7 @@ pub fn get_member_display_name(member: &BaseRoomMember) -> String {
 
 /// Checks if a message starts with a user_id mention
 /// Automatically handles @ in front of the name
-pub fn msg_starts_with_mention(user_id: UserId, msg: String) -> bool {
+pub fn msg_starts_with_mention(user_id: &UserId, msg: String) -> bool {
     let localpart = user_id.localpart().to_lowercase();
     // Catch "@botname ..." messages
     let msg = msg.replace(&format!("@{}", localpart), &localpart);
