@@ -9,7 +9,6 @@ use matrix_sdk::ruma::events::room::message::{
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::events::AnyRoomEvent;
 use matrix_sdk::ruma::{EventId, MxcUri, RoomId, UserId};
-use matrix_sdk::uuid::Uuid;
 use matrix_sdk::{Client, RoomMember};
 
 use std::convert::TryFrom;
@@ -152,9 +151,7 @@ impl Bot {
             BotMsgType::ReportingRoomPlainNotice => (&self.reporting_room, RoomMessageEventContent::notice_plain(msg)),
         };
 
-        let txn_id = Uuid::new_v4();
-
-        room.send(content, Some(txn_id))
+        room.send(content, None)
             .await
             .expect("Unable to send message");
     }
@@ -163,9 +160,8 @@ impl Bot {
     async fn send_reaction(&self, reaction: &str, msg_event_id: &EventId) {
         let content =
             ReactionEventContent::new(Relation::new(msg_event_id.clone(), reaction.to_string()));
-        let txn_id = Uuid::new_v4();
 
-        if let Err(err) = self.reporting_room.send(content, Some(txn_id)).await {
+        if let Err(err) = self.reporting_room.send(content, None).await {
             warn!(
                 "Could not send {} reaction to msg {}: {}",
                 reaction,
@@ -182,7 +178,6 @@ impl Bot {
         let file_content = FileMessageEventContent::plain(filename, url, None);
         let msgtype = MessageType::File(file_content);
         let content = RoomMessageEventContent::new(msgtype);
-        let txn_id = Uuid::new_v4();
 
         let room = if admin_room {
             &self.admin_room
@@ -190,9 +185,7 @@ impl Bot {
             &self.reporting_room
         };
 
-        room.send(content, Some(txn_id))
-            .await
-            .expect("Unable to send file");
+        room.send(content, None).await.expect("Unable to send file");
     }
 
     /// Handling room messages events
