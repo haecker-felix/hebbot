@@ -292,13 +292,13 @@ impl Bot {
             return;
         }
 
-        let reporter_id = member.user_id().to_string();
+        let reporter_id = member.user_id();
         let reporter_display_name = utils::get_member_display_name(member);
 
         // Create new news entry...
         let news = News::new(
             event_id.to_owned(),
-            reporter_id.clone(),
+            reporter_id.to_owned(),
             reporter_display_name,
             message,
         );
@@ -456,7 +456,7 @@ impl Bot {
                 // Check if related message is an image
                 MessageType::Image(image) => match reaction_type {
                     ReactionType::Notice => {
-                        let reporter_id = reaction_sender.user_id().to_string();
+                        let reporter_id = reaction_sender.user_id();
                         let news_store = self.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
                             related_event.sender().as_ref(),
@@ -495,7 +495,7 @@ impl Bot {
                 // Check if related message is a video
                 MessageType::Video(video) => match reaction_type {
                     ReactionType::Notice => {
-                        let reporter_id = reaction_sender.user_id().to_string();
+                        let reporter_id = reaction_sender.user_id();
                         let news_store = self.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
                             related_event.sender().as_ref(),
@@ -956,7 +956,7 @@ impl Bot {
     }
 
     async fn is_editor(&self, member: &RoomMember) -> bool {
-        let user_id = member.user_id().to_string();
+        let user_id = member.user_id().to_owned();
         self.config.editors.contains(&user_id)
     }
 

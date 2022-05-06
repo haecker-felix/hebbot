@@ -38,7 +38,7 @@ pub fn create_news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) 
         }),
     )) = any_room_event
     {
-        let reporter_id = sender.to_string();
+        let reporter_id = sender.to_owned();
         let reporter_display_name = get_member_display_name(member);
         let message = body.clone();
 

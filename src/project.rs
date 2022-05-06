@@ -1,3 +1,4 @@
+use matrix_sdk::ruma::OwnedUserId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
@@ -8,7 +9,7 @@ pub struct Project {
     pub description: String,
     pub website: String,
     pub default_section: String,
-    pub usual_reporters: Vec<String>,
+    pub usual_reporters: Vec<OwnedUserId>,
 }
 
 impl Project {
@@ -26,7 +27,8 @@ impl Project {
 
         let mut reporters = String::new();
         for usual_reporter in &self.usual_reporters {
-            reporters = reporters + usual_reporter + ", ";
+            reporters.push_str(usual_reporter.as_str());
+            reporters.push_str(", ");
         }
 
         reporters.pop();

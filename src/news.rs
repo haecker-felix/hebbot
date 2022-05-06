@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedMxcUri};
+use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedMxcUri, OwnedUserId};
 use serde::{Deserialize, Serialize};
 
 use std::cell::RefCell;
@@ -11,7 +11,7 @@ use crate::ReactionType;
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct News {
     pub event_id: OwnedEventId,
-    pub reporter_id: String,
+    pub reporter_id: OwnedUserId,
     pub reporter_display_name: String,
     pub timestamp: DateTime<Utc>,
     message: RefCell<String>,
@@ -24,7 +24,7 @@ pub struct News {
 impl News {
     pub fn new(
         event_id: OwnedEventId,
-        reporter_id: String,
+        reporter_id: OwnedUserId,
         reporter_display_name: String,
         message: String,
     ) -> Self {

@@ -1,3 +1,4 @@
+use matrix_sdk::ruma::OwnedUserId;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
@@ -7,7 +8,7 @@ pub struct Section {
     pub name: String,
     pub title: String,
     pub order: u32,
-    pub usual_reporters: Vec<String>,
+    pub usual_reporters: Vec<OwnedUserId>,
 }
 
 impl Section {
@@ -23,7 +24,8 @@ impl Section {
 
         let mut reporters = String::new();
         for usual_reporter in &self.usual_reporters {
-            reporters = reporters + usual_reporter + ", ";
+            reporters.push_str(usual_reporter.as_str());
+            reporters.push_str(", ");
         }
 
         reporters.pop();
