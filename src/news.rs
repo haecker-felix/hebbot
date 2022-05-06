@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use matrix_sdk::ruma::MxcUri;
+use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedMxcUri, OwnedUserId};
 use serde::{Deserialize, Serialize};
 
 use std::cell::RefCell;
@@ -10,21 +10,21 @@ use crate::ReactionType;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct News {
-    pub event_id: String,
-    pub reporter_id: String,
+    pub event_id: OwnedEventId,
+    pub reporter_id: OwnedUserId,
     pub reporter_display_name: String,
     pub timestamp: DateTime<Utc>,
     message: RefCell<String>,
-    section_names: RefCell<HashMap<String, String>>,
-    project_names: RefCell<HashMap<String, String>>,
-    images: RefCell<HashMap<String, (String, MxcUri)>>,
-    videos: RefCell<HashMap<String, (String, MxcUri)>>,
+    section_names: RefCell<HashMap<OwnedEventId, String>>,
+    project_names: RefCell<HashMap<OwnedEventId, String>>,
+    images: RefCell<HashMap<OwnedEventId, (String, OwnedMxcUri)>>,
+    videos: RefCell<HashMap<OwnedEventId, (String, OwnedMxcUri)>>,
 }
 
 impl News {
     pub fn new(
-        event_id: String,
-        reporter_id: String,
+        event_id: OwnedEventId,
+        reporter_id: OwnedUserId,
         reporter_display_name: String,
         message: String,
     ) -> Self {
@@ -68,7 +68,7 @@ impl News {
         names
     }
 
-    pub fn add_section_name(&self, event_id: String, emoji: String) {
+    pub fn add_section_name(&self, event_id: OwnedEventId, emoji: String) {
         self.section_names.borrow_mut().insert(event_id, emoji);
     }
 
@@ -79,31 +79,31 @@ impl News {
         names
     }
 
-    pub fn add_project_name(&self, event_id: String, emoji: String) {
+    pub fn add_project_name(&self, event_id: OwnedEventId, emoji: String) {
         self.project_names.borrow_mut().insert(event_id, emoji);
     }
 
-    pub fn images(&self) -> Vec<(String, MxcUri)> {
+    pub fn images(&self) -> Vec<(String, OwnedMxcUri)> {
         Self::files(&*self.images.borrow())
     }
 
-    pub fn add_image(&self, event_id: String, filename: String, mxc_uri: MxcUri) {
+    pub fn add_image(&self, event_id: OwnedEventId, filename: String, mxc_uri: OwnedMxcUri) {
         self.images
             .borrow_mut()
             .insert(event_id, (filename, mxc_uri));
     }
 
-    pub fn videos(&self) -> Vec<(String, MxcUri)> {
+    pub fn videos(&self) -> Vec<(String, OwnedMxcUri)> {
         Self::files(&*self.videos.borrow())
     }
 
-    pub fn add_video(&self, event_id: String, filename: String, mxc_uri: MxcUri) {
+    pub fn add_video(&self, event_id: OwnedEventId, filename: String, mxc_uri: OwnedMxcUri) {
         self.videos
             .borrow_mut()
             .insert(event_id, (filename, mxc_uri));
     }
 
-    fn files(files: &HashMap<String, (String, MxcUri)>) -> Vec<(String, MxcUri)> {
+    fn files(files: &HashMap<OwnedEventId, (String, OwnedMxcUri)>) -> Vec<(String, OwnedMxcUri)> {
         let mut images_map = HashMap::new();
         let mut images = Vec::new();
 
@@ -127,7 +127,7 @@ impl News {
         images
     }
 
-    pub fn remove_reaction_id(&self, event_id: &str) -> ReactionType {
+    pub fn remove_reaction_id(&self, event_id: &EventId) -> ReactionType {
         if self.section_names.borrow_mut().remove(event_id).is_some() {
             ReactionType::Section(None)
         } else if self.project_names.borrow_mut().remove(event_id).is_some() {
@@ -137,7 +137,7 @@ impl News {
         }
     }
 
-    pub fn relates_to_reaction_id(&self, reaction_id: &str) -> bool {
+    pub fn relates_to_reaction_id(&self, reaction_id: &EventId) -> bool {
         for i in self.section_names.borrow().keys() {
             if i == reaction_id {
                 return true;

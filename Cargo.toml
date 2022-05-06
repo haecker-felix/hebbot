@@ -5,7 +5,7 @@ authors = ["Felix Häcker <haeckerfelix@gnome.org>"]
 edition = "2018"
 
 [dependencies]
-matrix-sdk = { git="https://github.com/matrix-org/matrix-rust-sdk" }
+matrix-sdk = { git = "https://github.com/matrix-org/matrix-rust-sdk" }
 serde = "1.0"
 serde_json = "1.0"
 url = "2.2"

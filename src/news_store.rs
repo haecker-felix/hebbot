@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use matrix_sdk::ruma::{EventId, OwnedEventId};
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -8,7 +9,7 @@ use std::{env, fs};
 use crate::{Error, News};
 
 pub struct NewsStore {
-    news_map: HashMap<String, News>,
+    news_map: HashMap<OwnedEventId, News>,
 }
 
 impl NewsStore {
@@ -17,7 +18,7 @@ impl NewsStore {
         let path = Self::get_path();
         debug!("Trying to read stored news file from path: {:?}", path);
 
-        let news_map: HashMap<String, News> = if let Ok(mut file) = File::open(path) {
+        let news_map = if let Ok(mut file) = File::open(path) {
             let mut data = String::new();
             file.read_to_string(&mut data)
                 .expect("Unable to read news store file");
@@ -37,7 +38,7 @@ impl NewsStore {
         self.write_data();
     }
 
-    pub fn remove_news(&mut self, event_id: &str) -> Result<News, Error> {
+    pub fn remove_news(&mut self, event_id: &EventId) -> Result<News, Error> {
         if let Some(news) = self.news_map.remove(event_id) {
             debug!("Removed {:#?}", &news);
             self.write_data();
@@ -51,11 +52,11 @@ impl NewsStore {
         self.news_map.values().cloned().collect()
     }
 
-    pub fn news_by_message_id(&self, message_event_id: &str) -> Option<&News> {
+    pub fn news_by_message_id(&self, message_event_id: &EventId) -> Option<&News> {
         self.news_map.get(message_event_id)
     }
 
-    pub fn news_by_reaction_id(&self, reaction_event_id: &str) -> Option<&News> {
+    pub fn news_by_reaction_id(&self, reaction_event_id: &EventId) -> Option<&News> {
         for n in self.news_map.values() {
             if n.relates_to_reaction_id(reaction_event_id) {
                 return Some(n);
