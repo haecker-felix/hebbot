@@ -157,7 +157,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
     // Sort `RenderProject`s into `RenderSection`s
     for (_, render_project) in render_projects {
-        let section_name = if let Some(ref section_name) = render_project.overwritten_section {
+        let section_name = if let Some(section_name) = &render_project.overwritten_section {
             section_name.clone()
         } else {
             render_project.project.default_section.clone()

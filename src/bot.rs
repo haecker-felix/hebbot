@@ -190,7 +190,7 @@ impl Bot {
 
     /// Handling room messages events
     async fn on_room_message(event: SyncRoomMessageEvent, room: Room, Ctx(bot): Ctx<Bot>) {
-        if let Room::Joined(ref _joined) = room {
+        if let Room::Joined(_joined) = &room {
             // Standard text message
             if let Some(text) = utils::get_message_event_text(&event) {
                 let member = room.get_member(&event.sender).await.unwrap().unwrap();
@@ -221,7 +221,7 @@ impl Bot {
 
     /// Handling room reaction events
     async fn on_room_reaction(event: SyncReactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
-        if let Room::Joined(ref _joined) = room {
+        if let Room::Joined(_joined) = &room {
             let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
             let reaction_event_id = event.event_id.clone();
             let relation = &event.content.relates_to;
@@ -259,7 +259,7 @@ impl Bot {
 
     /// Handling room redaction events (= something got removed/reverted)
     async fn on_room_redaction(event: SyncRoomRedactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
-        if let Room::Joined(ref _joined) = room {
+        if let Room::Joined(_joined) = &room {
             let redacted_event_id = event.redacts.clone();
             let member = room.get_member(&event.sender).await.unwrap().unwrap();
 
