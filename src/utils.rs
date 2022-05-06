@@ -14,6 +14,7 @@ use regex::Regex;
 use std::env;
 use std::fs::File;
 use std::io::Read;
+use std::str;
 
 use crate::News;
 
@@ -152,8 +153,8 @@ pub async fn execute_command(launch: &str) -> Option<String> {
         .ok()?;
 
     let mut lines = String::new();
-    lines += &String::from_utf8(out.stdout).ok()?;
-    lines += &String::from_utf8(out.stderr).ok()?;
+    lines += str::from_utf8(&out.stdout).ok()?;
+    lines += str::from_utf8(&out.stderr).ok()?;
 
     dbg!(&lines);
     Some(lines)
