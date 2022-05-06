@@ -1,5 +1,5 @@
 use chrono::Datelike;
-use matrix_sdk::ruma::OwnedMxcUri;
+use matrix_sdk::ruma::{EventId, OwnedMxcUri};
 use matrix_sdk::RoomMember;
 use regex::Regex;
 
@@ -364,7 +364,7 @@ fn prepare_message(msg: String) -> String {
     msg.replace("> -", "> *")
 }
 
-fn message_link(config: &Config, event_id: &str) -> String {
+fn message_link(config: &Config, event_id: &EventId) -> String {
     let room_id = config.reporting_room_id.clone();
     format!(
         "<a href=\"https://matrix.to/#/{}/{}\">open message</a>",

@@ -247,13 +247,13 @@ impl Bot {
                 } else {
                     debug!(
                         "Reaction related message isn't a room message (id {})",
-                        related_event_id.to_string()
+                        related_event_id
                     );
                 }
             } else {
                 warn!(
                     "Couldn't get reaction related event (id {})",
-                    related_event_id.to_string()
+                    related_event_id
                 );
             }
         }
@@ -297,7 +297,7 @@ impl Bot {
 
         // Create new news entry...
         let news = News::new(
-            event_id.to_string(),
+            event_id.to_owned(),
             reporter_id.clone(),
             reporter_display_name,
             message,
@@ -313,14 +313,13 @@ impl Bot {
         updated_message: String,
         edited_msg_event_id: &EventId,
     ) {
-        let event_id = edited_msg_event_id.to_string();
         let bot = self.client.user_id().await.unwrap();
         let updated_message = utils::remove_bot_name(&updated_message, &bot);
-        let link = self.message_link(edited_msg_event_id.to_string());
+        let link = self.message_link(edited_msg_event_id);
 
         let message = {
             let news_store = self.news_store.lock().unwrap();
-            let msg = if let Some(news) = news_store.news_by_message_id(&event_id) {
+            let msg = if let Some(news) = news_store.news_by_message_id(edited_msg_event_id) {
                 news.set_message(updated_message);
                 if news.is_assigned() {
                     Some(format!(
@@ -367,15 +366,14 @@ impl Bot {
         }
 
         let message: Option<String> = {
-            let reaction_event_id = reaction_event_id.to_string();
             let reaction_type = self.config.reaction_type_by_emoji(reaction_emoji);
-            let related_event_id = related_event.event_id().to_string();
+            let related_event_id = related_event.event_id();
             let related_event_timestamp: DateTime<Utc> = related_event
                 .origin_server_ts()
                 .to_system_time()
                 .unwrap()
                 .into();
-            let link = self.message_link(related_event_id.clone());
+            let link = self.message_link(related_event_id);
 
             if reaction_type == ReactionType::None {
                 debug!(
@@ -416,12 +414,12 @@ impl Bot {
                         .news_store
                         .lock()
                         .unwrap()
-                        .news_by_message_id(&related_event_id)
+                        .news_by_message_id(related_event_id)
                     {
                         match reaction_type {
                             ReactionType::Section(section) => {
                                 let section = section.unwrap();
-                                news.add_section_name(reaction_event_id, section.name);
+                                news.add_section_name(reaction_event_id.to_owned(), section.name);
                                 Some(format!(
                                     "✅ Editor {} added {}’s news entry [{}] to the “{}” section.",
                                     reaction_sender.user_id(),
@@ -432,7 +430,7 @@ impl Bot {
                             }
                             ReactionType::Project(project) => {
                                 let project = project.unwrap();
-                                news.add_project_name(reaction_event_id, project.name);
+                                news.add_project_name(reaction_event_id.to_owned(), project.name);
                                 Some(format!(
                                     "✅ Editor {} added the project description “{}” to {}’s news entry [{}].",
                                     reaction_sender.user_id(),
@@ -466,7 +464,7 @@ impl Bot {
                         ) {
                             if let MediaSource::Plain(mxc_uri) = &image.source {
                                 news.add_image(
-                                    reaction_event_id,
+                                    reaction_event_id.to_owned(),
                                     image.body.clone(),
                                     mxc_uri.clone(),
                                 );
@@ -505,7 +503,7 @@ impl Bot {
                         ) {
                             if let MediaSource::Plain(mxc_uri) = &video.source {
                                 news.add_video(
-                                    reaction_event_id,
+                                    reaction_event_id.to_owned(),
                                     video.body.clone(),
                                     mxc_uri.clone(),
                                 );
@@ -560,11 +558,11 @@ impl Bot {
         let message = {
             let is_editor = self.is_editor(member).await;
             let mut news_store = self.news_store.lock().unwrap();
-            let redacted_event_id = redacted_event_id.to_string();
-            let link = self.message_link(redacted_event_id.clone());
+            let redacted_event_id = redacted_event_id;
+            let link = self.message_link(redacted_event_id);
 
             // Redaction / deletion of the news entry itself
-            let msg = if let Ok(news) = news_store.remove_news(&redacted_event_id) {
+            let msg = if let Ok(news) = news_store.remove_news(redacted_event_id) {
                 Some(format!(
                     "✅ {}’s news entry got deleted by {}",
                     news.reporter_id,
@@ -574,8 +572,8 @@ impl Bot {
             } else if !is_editor {
                 None
             // Redaction of reaction events (project / section)
-            } else if let Some(news) = news_store.news_by_reaction_id(&redacted_event_id.clone()) {
-                let reaction_type = news.remove_reaction_id(&redacted_event_id);
+            } else if let Some(news) = news_store.news_by_reaction_id(redacted_event_id) {
+                let reaction_type = news.remove_reaction_id(redacted_event_id);
                 if reaction_type != ReactionType::None {
                     Some(format!(
                         "✅ Editor {} removed {} from {}’s news entry ({}).",
@@ -845,7 +843,7 @@ impl Bot {
             let mut unassigned_list = String::new();
 
             for n in &news {
-                let link = self.message_link(n.event_id.clone());
+                let link = self.message_link(&n.event_id);
                 let summary = n.message_summary();
 
                 if n.is_assigned() {
@@ -897,7 +895,7 @@ impl Bot {
     }
 
     async fn add_news(&self, news: News, notify_reporter: bool) {
-        let link = self.message_link(news.event_id.to_string());
+        let link = self.message_link(&news.event_id);
 
         // Check if the news already exists
         if self
@@ -962,7 +960,7 @@ impl Bot {
         self.config.editors.contains(&user_id)
     }
 
-    fn message_link(&self, event_id: String) -> String {
+    fn message_link(&self, event_id: &EventId) -> String {
         let room_id = self.config.reporting_room_id.clone();
         format!(
             "<a href=\"https://matrix.to/#/{}/{}\">open message</a>",

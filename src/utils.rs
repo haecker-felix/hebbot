@@ -43,7 +43,7 @@ pub fn create_news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) 
         let message = body.clone();
 
         let news = News::new(
-            any_room_event.event_id().to_string(),
+            any_room_event.event_id().to_owned(),
             reporter_id,
             reporter_display_name,
             message,
