@@ -13,15 +13,6 @@ pub struct Section {
 
 impl Section {
     pub fn html_details(&self) -> String {
-        let content = format!(
-            "<b>Section Details</b><br>\
-            <b>Emoji</b>: {} <br>\
-            <b>Name</b>: {} ({}) <br>\
-            <b>Order</b>: {} <br>\
-            <b>Reporters</b>: ",
-            self.emoji, self.title, self.name, self.order
-        );
-
         let mut reporters = String::new();
         for usual_reporter in &self.usual_reporters {
             reporters.push_str(usual_reporter.as_str());
@@ -30,7 +21,15 @@ impl Section {
 
         reporters.pop();
         reporters.pop();
-        format!("{} {}", content, reporters)
+
+        format!(
+            "<b>Section Details</b><br>\
+            <b>Emoji</b>: {} <br>\
+            <b>Name</b>: {} ({}) <br>\
+            <b>Order</b>: {} <br>\
+            <b>Reporters</b>: {}",
+            self.emoji, self.title, self.name, self.order, reporters
+        )
     }
 }
 
