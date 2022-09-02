@@ -15,6 +15,7 @@ use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, UserId};
 use matrix_sdk::{Client, RoomMember};
 
 use std::env;
+use std::fmt::Write;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -731,10 +732,12 @@ impl Bot {
 
         let mut list = String::new();
         for e in config.projects {
-            list += &format!(
+            write!(
+                list,
                 "{}: {} - {} ({})\n",
                 e.emoji, e.title, e.description, e.website
-            );
+            )
+            .unwrap();
         }
 
         let msg = format!("List of projects:\n<pre><code>{}</code></pre>\n", list);
@@ -747,7 +750,7 @@ impl Bot {
 
         let mut list = String::new();
         for e in config.sections {
-            list += &format!("{}: {}\n", e.emoji, e.title);
+            write!(list, "{}: {}\n", e.emoji, e.title).unwrap();
         }
 
         let msg = format!("List of sections:\n<pre><code>{}</code></pre>\n", list);
@@ -810,7 +813,7 @@ impl Bot {
                         uri.media_id().unwrap()
                     );
 
-                    curl_command += &format!(" {} -o {}", url, filename);
+                    write!(curl_command, " {} -o {}", url, filename).unwrap();
                 }
             }
 
@@ -848,10 +851,20 @@ impl Bot {
 
                 if n.is_assigned() {
                     assigned_count += 1;
-                    assigned_list += &format!("- [{}] {}: {} <br>", link, n.reporter_id, summary);
+                    write!(
+                        assigned_list,
+                        "- [{}] {}: {} <br>",
+                        link, n.reporter_id, summary
+                    )
+                    .unwrap();
                 } else {
                     unassigned_count += 1;
-                    unassigned_list += &format!("- [{}] {}: {} <br>", link, n.reporter_id, summary);
+                    write!(
+                        unassigned_list,
+                        "- [{}] {}: {} <br>",
+                        link, n.reporter_id, summary
+                    )
+                    .unwrap();
                 }
             }
 

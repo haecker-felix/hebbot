@@ -4,6 +4,7 @@ use matrix_sdk::RoomMember;
 use regex::Regex;
 
 use std::collections::{BTreeMap, HashSet};
+use std::fmt::Write;
 
 use crate::{utils, Config, News, Project, Section};
 
@@ -192,7 +193,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     // Do the actual markdown rendering
     for (_, render_section) in sorted_render_sections {
         let rendered_section = render_section_md(&render_section, &config);
-        rendered_report += &format!("{}\n\n", rendered_section);
+        write!(rendered_report, "{}\n\n", rendered_section).unwrap();
     }
 
     // Create summary notes for the admin room

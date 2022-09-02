@@ -11,6 +11,7 @@ use matrix_sdk::ruma::{EventId, OwnedEventId, UserId};
 use matrix_sdk::{BaseRoomMember, RoomMember};
 use regex::Regex;
 
+use std::fmt::Write;
 use std::fs::File;
 use std::io::Read;
 use std::{env, str};
@@ -131,7 +132,7 @@ pub fn format_messages(is_warning: bool, list: &[String]) -> String {
 
     let mut messages = String::new();
     for message in list {
-        messages += &format!("- {} {}<br>", emoji, message);
+        write!(messages, "- {} {}<br>", emoji, message).unwrap();
     }
     messages
 }
