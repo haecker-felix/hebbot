@@ -352,7 +352,7 @@ fn prepare_message(msg: String) -> String {
     let msg = matrix_rooms_re.replace_all(&msg, " [$1](https://matrix.to/#/$1)");
 
     // Turn <del> tags into markdown strikethrough
-    // NOTE: this does not work for nested tag, whih shouldn't really happen in Matrix IM anyway
+    // NOTE: this does not work for nested tag, which shouldn't really happen in Matrix IM anyway
     let strikethrough_re = Regex::new("<del>(.+?)</del>").unwrap();
     let msg = strikethrough_re.replace_all(&msg, "~~$1~~");
 
