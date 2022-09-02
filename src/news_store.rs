@@ -57,13 +57,9 @@ impl NewsStore {
     }
 
     pub fn news_by_reaction_id(&self, reaction_event_id: &EventId) -> Option<&News> {
-        for n in self.news_map.values() {
-            if n.relates_to_reaction_id(reaction_event_id) {
-                return Some(n);
-            }
-        }
-
-        None
+        self.news_map
+            .values()
+            .find(|&n| n.relates_to_reaction_id(reaction_event_id))
     }
 
     pub fn find_related_news(&self, reporter_id: &str, timestamp: &DateTime<Utc>) -> Option<&News> {

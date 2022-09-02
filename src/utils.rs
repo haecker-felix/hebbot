@@ -11,10 +11,9 @@ use matrix_sdk::ruma::{EventId, OwnedEventId, UserId};
 use matrix_sdk::{BaseRoomMember, RoomMember};
 use regex::Regex;
 
-use std::env;
 use std::fs::File;
 use std::io::Read;
-use std::str;
+use std::{env, str};
 
 use crate::News;
 

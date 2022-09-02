@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::{Project, Section};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ReactionType {
     Section(Option<Section>),
     Project(Option<Project>),

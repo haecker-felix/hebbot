@@ -84,7 +84,7 @@ impl News {
     }
 
     pub fn images(&self) -> Vec<(String, OwnedMxcUri)> {
-        Self::files(&*self.images.borrow())
+        Self::files(&self.images.borrow())
     }
 
     pub fn add_image(&self, event_id: OwnedEventId, filename: String, mxc_uri: OwnedMxcUri) {
@@ -94,7 +94,7 @@ impl News {
     }
 
     pub fn videos(&self) -> Vec<(String, OwnedMxcUri)> {
-        Self::files(&*self.videos.borrow())
+        Self::files(&self.videos.borrow())
     }
 
     pub fn add_video(&self, event_id: OwnedEventId, filename: String, mxc_uri: OwnedMxcUri) {
