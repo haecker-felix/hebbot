@@ -732,9 +732,9 @@ impl Bot {
 
         let mut list = String::new();
         for e in config.projects {
-            write!(
+            writeln!(
                 list,
-                "{}: {} - {} ({})\n",
+                "{}: {} - {} ({})",
                 e.emoji, e.title, e.description, e.website
             )
             .unwrap();
@@ -750,7 +750,7 @@ impl Bot {
 
         let mut list = String::new();
         for e in config.sections {
-            write!(list, "{}: {}\n", e.emoji, e.title).unwrap();
+            writeln!(list, "{}: {}", e.emoji, e.title).unwrap();
         }
 
         let msg = format!("List of sections:\n<pre><code>{}</code></pre>\n", list);
