@@ -36,10 +36,6 @@ title = 'Shortwave'
 description = 'Internet radio player with over 25000 stations.'
 website = 'https://gitlab.gnome.org/World/Shortwave'
 default_section = 'circle'
-usual_reporters = [
-    '@user1:domain.io',
-    '@user2:domain.com',
-]
 
 [[projects]]
 emoji = '⬇️'
@@ -48,4 +44,3 @@ title = 'Fragments'
 description = 'Easy to use BitTorrent client.'
 website = 'https://gitlab.gnome.org/World/Fragments'
 default_section = 'circle'
-usual_reporters = []
