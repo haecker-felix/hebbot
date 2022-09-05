@@ -966,10 +966,15 @@ impl Bot {
             // Pre-populate with emojis to facilitate the editor's work
             let msg_lowercase = news.message().to_lowercase();
             for project in &self.config.projects {
-                let regex = Regex::new(&format!("\\b{}\\b|\\b{}\\b",project.name.to_lowercase(),project.title.to_lowercase())).unwrap();
+                let regex = Regex::new(&format!(
+                    "\\b{}\\b|\\b{}\\b",
+                    project.name.to_lowercase(),
+                    project.title.to_lowercase()
+                ))
+                .unwrap();
                 if regex.is_match(&msg_lowercase) {
                     self.send_reaction(&project.emoji, &EventId::parse(&news.event_id).unwrap())
-                    .await;
+                        .await;
                 }
             }
             for section in self.config.sections_by_usual_reporter(&news.reporter_id) {
