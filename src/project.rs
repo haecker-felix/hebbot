@@ -12,7 +12,6 @@ pub struct Project {
 
 impl Project {
     pub fn html_details(&self) -> String {
-
         format!(
             "<b>Project Details</b><br>\
             <b>Emoji</b>: {} <br>\
@@ -20,12 +19,7 @@ impl Project {
             <b>Description</b>: {} <br>\
             <b>Website</b>: {} <br>\
             <b>Default Section</b>: {} <br>",
-            self.emoji,
-            self.title,
-            self.name,
-            self.description,
-            self.website,
-            self.default_section,
+            self.emoji, self.title, self.name, self.description, self.website, self.default_section,
         )
     }
 }
