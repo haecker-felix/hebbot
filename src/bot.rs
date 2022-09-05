@@ -359,9 +359,13 @@ impl Bot {
     ) {
         // Only allow editors to use general commands
         // or the general public to use the notice emoji
+        let sender_is_hebbot = reaction_sender.user_id().as_str() == self.config.bot_user_id;
         let sender_is_editor = self.is_editor(reaction_sender).await;
-        if reaction_sender.user_id().as_str() == self.config.bot_user_id
-            || (!sender_is_editor && !utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji))
+        let sender_is_reporter = false;
+        if sender_is_hebbot
+            || (self.config.restrict_notice
+                && (!sender_is_reporter || !sender_is_editor)
+                && !utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji))
         {
             return;
         }
