@@ -13,6 +13,7 @@ use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::AnyRoomEvent;
 use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, UserId};
 use matrix_sdk::{Client, RoomMember};
+use regex::Regex;
 
 use std::env;
 use std::fmt::Write;
@@ -963,9 +964,13 @@ impl Bot {
             news.set_message(utils::remove_bot_name(&news.message(), &bot_id));
 
             // Pre-populate with emojis to facilitate the editor's work
-            for project in self.config.projects_by_usual_reporter(&news.reporter_id) {
-                self.send_reaction(&project.emoji, &EventId::parse(&news.event_id).unwrap())
+            let msg_lowercase = news.message().to_lowercase();
+            for project in &self.config.projects {
+                let regex = Regex::new(&format!("\\b{}\\b|\\b{}\\b",project.name.to_lowercase(),project.title.to_lowercase())).unwrap();
+                if regex.is_match(&msg_lowercase) {
+                    self.send_reaction(&project.emoji, &EventId::parse(&news.event_id).unwrap())
                     .await;
+                }
             }
             for section in self.config.sections_by_usual_reporter(&news.reporter_id) {
                 self.send_reaction(&section.emoji, &EventId::parse(&news.event_id).unwrap())
