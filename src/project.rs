@@ -12,10 +12,6 @@ pub struct Project {
 
 impl Project {
     pub fn html_details(&self) -> String {
-        let mut reporters = String::new();
-
-        reporters.pop();
-        reporters.pop();
 
         format!(
             "<b>Project Details</b><br>\
@@ -23,15 +19,13 @@ impl Project {
             <b>Name</b>: {} ({}) <br>\
             <b>Description</b>: {} <br>\
             <b>Website</b>: {} <br>\
-            <b>Default Section</b>: {} <br>\
-            <b>Usual reporters</b>: {}",
+            <b>Default Section</b>: {} <br>",
             self.emoji,
             self.title,
             self.name,
             self.description,
             self.website,
             self.default_section,
-            reporters
         )
     }
 }
