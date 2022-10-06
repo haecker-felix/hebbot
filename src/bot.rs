@@ -399,8 +399,9 @@ impl Bot {
                             .unwrap()
                             .unwrap();
 
-                        if reaction_sender.user_id() != related_event_sender.user_id()
-                            && self.config.restrict_notice
+                        if !sender_is_editor
+                            && (reaction_sender.user_id() != related_event_sender.user_id()
+                                && self.config.restrict_notice)
                         {
                             return;
                         }
@@ -472,6 +473,12 @@ impl Bot {
                             related_event.sender().as_ref(),
                             &related_event_timestamp,
                         ) {
+                            if !sender_is_editor
+                                && (reaction_sender.user_id() != related_event.sender()
+                                    && self.config.restrict_notice)
+                            {
+                                return;
+                            }
                             if let MediaSource::Plain(mxc_uri) = &image.source {
                                 news.add_image(
                                     reaction_event_id.to_owned(),
