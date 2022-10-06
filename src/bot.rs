@@ -964,17 +964,14 @@ impl Bot {
             news.set_message(utils::remove_bot_name(&news.message(), &bot_id));
 
             // Pre-populate with emojis to facilitate the editor's work
-            let msg_lowercase = .to_lowercase();
             for project in &self.config.projects {
                 let regex = Regex::new(&format!(
                     "(?i)\\b{}\\b|\\b{}\\b",
-                    project.name,
-                    project.title,
+                    project.name, project.title,
                 ))
                 .unwrap();
                 if regex.is_match(&news.message()) {
-                    self.send_reaction(&project.emoji, &news.event_id)
-                        .await;
+                    self.send_reaction(&project.emoji, &news.event_id).await;
                 }
             }
             for section in self.config.sections_by_usual_reporter(&news.reporter_id) {
