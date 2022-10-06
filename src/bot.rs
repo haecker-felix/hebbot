@@ -973,7 +973,7 @@ impl Bot {
                 ))
                 .unwrap();
                 if regex.is_match(&news.message()) {
-                    self.send_reaction(&project.emoji, &EventId::parse(&news.event_id).unwrap())
+                    self.send_reaction(&project.emoji, &news.event_id)
                         .await;
                 }
             }
