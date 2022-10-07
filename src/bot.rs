@@ -359,9 +359,12 @@ impl Bot {
     ) {
         // Only allow editors to use general commands
         // or the general public to use the notice emoji
+        let sender_is_hebbot = reaction_sender.user_id().as_str() == self.config.bot_user_id;
         let sender_is_editor = self.is_editor(reaction_sender).await;
-        if reaction_sender.user_id().as_str() == self.config.bot_user_id
-            || (!sender_is_editor && !utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji))
+        if sender_is_hebbot
+            || (self.config.restrict_notice
+                && !sender_is_editor
+                && !utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji))
         {
             return;
         }
@@ -395,6 +398,13 @@ impl Bot {
                             .await
                             .unwrap()
                             .unwrap();
+
+                        if !sender_is_editor
+                            && (reaction_sender.user_id() != related_event_sender.user_id()
+                                && self.config.restrict_notice)
+                        {
+                            return;
+                        }
 
                         if let Some(news) =
                             utils::create_news_by_event(related_event, &related_event_sender)
@@ -463,6 +473,12 @@ impl Bot {
                             related_event.sender().as_ref(),
                             &related_event_timestamp,
                         ) {
+                            if !sender_is_editor
+                                && (reaction_sender.user_id() != related_event.sender()
+                                    && self.config.restrict_notice)
+                            {
+                                return;
+                            }
                             if let MediaSource::Plain(mxc_uri) = &image.source {
                                 news.add_image(
                                     reaction_event_id.to_owned(),
