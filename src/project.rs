@@ -1,8 +1,11 @@
-use serde::{de, Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize, Serializer};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct Project {
-    #[serde(deserialize_with = "deserialize_emoji")]
+    #[serde(
+        serialize_with = "serialize_emoji",
+        deserialize_with = "deserialize_emoji"
+    )]
     pub emoji: String,
     pub name: String,
     pub title: String,
@@ -30,4 +33,13 @@ where
     D: de::Deserializer<'de>,
 {
     Ok(format!("{}?", String::deserialize(deserializer)?))
+}
+
+fn serialize_emoji<S>(emoji: &String, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut emoji_without_question_mark = emoji.to_string();
+    emoji_without_question_mark.pop();
+    s.serialize_str(&emoji_without_question_mark)
 }
