@@ -358,6 +358,8 @@ impl Bot {
         related_event: &AnyRoomEvent,
         related_message_type: &MessageType,
     ) {
+        let reaction_emoji = reaction_emoji.strip_suffix('?').unwrap_or(reaction_emoji);
+
         // Only allow editors to use general commands
         // or the general public to use the notice emoji
         let sender_is_hebbot = reaction_sender.user_id().as_str() == self.config.bot_user_id;
@@ -971,7 +973,8 @@ impl Bot {
                 ))
                 .unwrap();
                 if regex.is_match(&news.message()) {
-                    self.send_reaction(&project.emoji, &news.event_id).await;
+                    self.send_reaction(&format!("{}?", &project.emoji), &news.event_id)
+                        .await;
                 }
             }
             for section in self.config.sections_by_usual_reporter(&news.reporter_id) {
