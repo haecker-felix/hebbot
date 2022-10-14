@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::event_handler::Ctx;
+use matrix_sdk::room::RoomMember;
 use matrix_sdk::room::{Joined, Room};
 use matrix_sdk::ruma::events::reaction::{
     OriginalSyncReactionEvent, ReactionEventContent, Relation,
@@ -10,9 +11,9 @@ use matrix_sdk::ruma::events::room::message::{
 };
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::events::room::MediaSource;
-use matrix_sdk::ruma::events::AnyRoomEvent;
-use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, UserId};
-use matrix_sdk::{Client, RoomMember};
+use matrix_sdk::ruma::events::AnyTimelineEvent;
+use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, ServerName, UserId};
+use matrix_sdk::Client;
 use regex::Regex;
 
 use std::env;
@@ -42,7 +43,12 @@ impl Bot {
         let password = env::var("BOT_PASSWORD").expect("BOT_PASSWORD env variable not specified");
 
         let user = UserId::parse(username).expect("Unable to parse bot user id");
-        let client = Client::builder().user_id(&user).build().await.unwrap();
+        let server_name = ServerName::parse(user.server_name()).unwrap();
+        let client = Client::builder()
+            .server_name(&server_name)
+            .build()
+            .await
+            .unwrap();
 
         Self::login(&client, user.localpart(), &password).await;
 
@@ -106,24 +112,23 @@ impl Bot {
         }
 
         // Setup event handlers
-        bot.client
-            .register_event_handler_context(bot.clone())
-            .register_event_handler(Self::on_room_message)
-            .await
-            .register_event_handler(Self::on_room_reaction)
-            .await
-            .register_event_handler(Self::on_room_redaction)
-            .await;
+        bot.client.add_event_handler_context(bot.clone());
+
+        bot.client.add_event_handler(Self::on_room_message);
+        bot.client.add_event_handler(Self::on_room_reaction);
+        bot.client.add_event_handler(Self::on_room_redaction);
 
         info!("Started syncing…");
-        bot.client.sync(SyncSettings::new()).await;
+        bot.client.sync(SyncSettings::new()).await.unwrap();
     }
 
     /// Login
     async fn login(client: &Client, user: &str, pwd: &str) {
         info!("Logging in…");
         let response = client
-            .login(user, pwd, Some("hebbot"), Some("hebbot"))
+            .login_username(user, pwd)
+            .initial_device_display_name("hebbot")
+            .send()
             .await
             .expect("Unable to login");
 
@@ -289,9 +294,9 @@ impl Bot {
         event_id: &EventId,
     ) {
         // We're going to ignore all messages, expect it mentions the bot at the beginning
-        let bot_id = self.client.user_id().await.unwrap();
-        let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
-        if !utils::msg_starts_with_mention(&bot_id, bot_display_name, message.clone()) {
+        let bot_id = self.client.user_id().unwrap();
+        let bot_display_name = self.client.account().get_display_name().await.unwrap();
+        if !utils::msg_starts_with_mention(bot_id, bot_display_name, message.clone()) {
             return;
         }
 
@@ -316,9 +321,9 @@ impl Bot {
         updated_message: String,
         edited_msg_event_id: &EventId,
     ) {
-        let bot_id = self.client.user_id().await.unwrap();
+        let bot_id = self.client.user_id().unwrap();
         let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
-        let updated_message = utils::remove_bot_name(&bot_id, bot_display_name, &updated_message);
+        let updated_message = utils::remove_bot_name(bot_id, bot_display_name, &updated_message);
         let link = self.message_link(edited_msg_event_id);
 
         let message = {
@@ -357,7 +362,7 @@ impl Bot {
         reaction_sender: &RoomMember,
         reaction_emoji: &str,
         reaction_event_id: &EventId,
-        related_event: &AnyRoomEvent,
+        related_event: &AnyTimelineEvent,
         related_message_type: &MessageType,
     ) {
         let reaction_emoji = reaction_emoji.strip_suffix('?').unwrap_or(reaction_emoji);
@@ -789,10 +794,11 @@ impl Bot {
         };
 
         // Upload rendered content as markdown file
-        let mut bytes = result.rendered.as_bytes();
+        let bytes = result.rendered.as_bytes();
         let response = self
             .client
-            .upload(&mime::TEXT_PLAIN_UTF_8, &mut bytes)
+            .media()
+            .upload(&mime::TEXT_PLAIN_UTF_8, bytes)
             .await
             .expect("Can't upload rendered file.");
 
@@ -949,10 +955,10 @@ impl Bot {
         }
 
         // remove bot name from message before we check length
-        let bot_id = self.client.user_id().await.unwrap();
+        let bot_id = self.client.user_id().unwrap();
         let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
         news.set_message(utils::remove_bot_name(
-            &bot_id,
+            bot_id,
             bot_display_name,
             &news.message(),
         ));
@@ -1014,3 +1020,4 @@ impl Bot {
         )
     }
 }
+

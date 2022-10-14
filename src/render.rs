@@ -1,6 +1,6 @@
 use chrono::Datelike;
+use matrix_sdk::room::RoomMember;
 use matrix_sdk::ruma::{EventId, OwnedMxcUri};
-use matrix_sdk::RoomMember;
 use regex::Regex;
 
 use std::collections::{BTreeMap, HashSet};
@@ -372,3 +372,4 @@ fn message_link(config: &Config, event_id: &EventId) -> String {
         room_id, event_id
     )
 }
+

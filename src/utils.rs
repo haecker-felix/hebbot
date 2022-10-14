@@ -1,14 +1,15 @@
 use async_process::{Command, Stdio};
 use matrix_sdk::room::Room;
+use matrix_sdk::room::RoomMember;
 use matrix_sdk::ruma::events::room::message::{
     MessageType, NoticeMessageEventContent, OriginalSyncRoomMessageEvent, Relation,
     RoomMessageEventContent, TextMessageEventContent,
 };
 use matrix_sdk::ruma::events::{
-    AnyMessageLikeEvent, AnyRoomEvent, MessageLikeEvent, OriginalMessageLikeEvent,
+    AnyMessageLikeEvent, AnyTimelineEvent, MessageLikeEvent, OriginalMessageLikeEvent,
 };
 use matrix_sdk::ruma::{EventId, OwnedEventId, UserId};
-use matrix_sdk::{BaseRoomMember, RoomMember};
+use matrix_sdk::BaseRoomMember;
 use regex::Regex;
 
 use std::fmt::Write;
@@ -18,14 +19,17 @@ use std::{env, str};
 
 use crate::News;
 
-/// Try to convert a `AnyRoomEvent` into a `News`
-pub fn create_news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) -> Option<News> {
+/// Try to convert a `AnyTimelineEvent` into a `News`
+pub fn create_news_by_event(
+    any_room_event: &AnyTimelineEvent,
+    member: &RoomMember,
+) -> Option<News> {
     // Fetch related event's
     // * event_id
     // * reporter_id
     // * reporter_display_name
     // * message
-    if let AnyRoomEvent::MessageLike(AnyMessageLikeEvent::RoomMessage(
+    if let AnyTimelineEvent::MessageLike(AnyMessageLikeEvent::RoomMessage(
         MessageLikeEvent::Original(OriginalMessageLikeEvent {
             content:
                 RoomMessageEventContent {
@@ -57,12 +61,12 @@ pub fn create_news_by_event(any_room_event: &AnyRoomEvent, member: &RoomMember) 
 }
 
 /// Get room message by event id
-pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyRoomEvent> {
+pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyTimelineEvent> {
     room.event(event_id).await.ok()?.event.deserialize().ok()
 }
 
-pub async fn message_type(room_event: &AnyRoomEvent) -> Option<MessageType> {
-    if let AnyRoomEvent::MessageLike(AnyMessageLikeEvent::RoomMessage(
+pub async fn message_type(room_event: &AnyTimelineEvent) -> Option<MessageType> {
+    if let AnyTimelineEvent::MessageLike(AnyMessageLikeEvent::RoomMessage(
         MessageLikeEvent::Original(ev),
     )) = room_event
     {
@@ -197,3 +201,4 @@ pub fn file_from_env(env_var_name: &str, fallback: &str) -> String {
 
     template
 }
+
