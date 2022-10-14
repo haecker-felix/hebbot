@@ -6,10 +6,11 @@ notice_emoji = '⭕'
 restrict_notice = true
 image_markdown = '> ![]({{file}})'
 video_markdown = '> {{< video src="{{file}}" >}}'
-verbs = ['reports', 'says', 'announces']
+verbs = ["reports", "says", "announces"]
+min_length = 30
 # Set to '' to disable text response
 ack_text = "✅ Thanks for the report {{user}}, I'll store your update!"
-update_config_command = 'sh /data/update_config.sh'
+update_config_command = "sh /data/update_config.sh"
 editors = [
     '@user1:domain.io',
     '@user2:domain.com',

@@ -948,29 +948,23 @@ impl Bot {
             return;
         }
 
+        // remove bot name from message before we check length
+        let bot_id = self.client.user_id().await.unwrap();
+        news.set_message(utils::remove_bot_name(&news.message(), &bot_id));
+
         // Check min message length
-        if news.message().len() > 30 {
-            if notify_reporter && !self.config.ack_text.is_empty() {
-                let msg = &self
-                    .config
-                    .ack_text
-                    .replace("{{user}}", &news.reporter_display_name);
-                self.send_message(msg, BotMsgType::ReportingRoomPlainNotice)
-                    .await;
+        if news.message().len() > self.config.min_length {
+            if notify_reporter {
+                let msg = format!(
+                    "✅ Thanks for the report {}, I'll store your update!",
+                    news.reporter_display_name
+                );
+                self.send_message(&msg, BotMsgType::ReportingRoomPlainNotice).await;
             }
 
             let msg = format!("✅ {} submitted a news entry. [{}]", news.reporter_id, link);
             self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
                 .await;
-
-            // remove bot name from message
-            let bot_id = self.client.user_id().await.unwrap();
-            let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
-            news.set_message(utils::remove_bot_name(
-                &bot_id,
-                bot_display_name,
-                &news.message(),
-            ));
 
             // Pre-populate with emojis to facilitate the editor's work
             for project in &self.config.projects {
