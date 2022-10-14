@@ -75,17 +75,6 @@ impl Config {
         ReactionType::None
     }
 
-    pub fn projects_by_usual_reporter(&self, reporter: &UserId) -> Vec<Project> {
-        let mut projects_for_this_reporter = Vec::<Project>::new();
-        for project in &self.projects {
-            if project.usual_reporters.contains(&reporter.to_owned()) {
-                projects_for_this_reporter.push(project.clone())
-            }
-        }
-
-        projects_for_this_reporter
-    }
-
     pub fn sections_by_usual_reporter(&self, reporter: &UserId) -> Vec<Section> {
         let mut sections_for_this_reporter = Vec::<Section>::new();
         for section in &self.sections {

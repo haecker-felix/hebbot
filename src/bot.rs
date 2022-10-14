@@ -13,6 +13,7 @@ use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::AnyRoomEvent;
 use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, UserId};
 use matrix_sdk::{Client, RoomMember};
+use regex::Regex;
 
 use std::env;
 use std::fmt::Write;
@@ -357,6 +358,8 @@ impl Bot {
         related_event: &AnyRoomEvent,
         related_message_type: &MessageType,
     ) {
+        let reaction_emoji = reaction_emoji.strip_suffix('?').unwrap_or(reaction_emoji);
+
         // Only allow editors to use general commands
         // or the general public to use the notice emoji
         let sender_is_hebbot = reaction_sender.user_id().as_str() == self.config.bot_user_id;
@@ -963,9 +966,16 @@ impl Bot {
             news.set_message(utils::remove_bot_name(&news.message(), &bot_id));
 
             // Pre-populate with emojis to facilitate the editor's work
-            for project in self.config.projects_by_usual_reporter(&news.reporter_id) {
-                self.send_reaction(&project.emoji, &EventId::parse(&news.event_id).unwrap())
-                    .await;
+            for project in &self.config.projects {
+                let regex = Regex::new(&format!(
+                    "(?i)\\b{}\\b|\\b{}\\b",
+                    project.name, project.title,
+                ))
+                .unwrap();
+                if regex.is_match(&news.message()) {
+                    self.send_reaction(&format!("{}?", &project.emoji), &news.event_id)
+                        .await;
+                }
             }
             for section in self.config.sections_by_usual_reporter(&news.reporter_id) {
                 self.send_reaction(&section.emoji, &EventId::parse(&news.event_id).unwrap())
