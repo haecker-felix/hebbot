@@ -24,9 +24,8 @@ Check out documentation for...
 - latest [stable release v2.1](https://github.com/haecker-felix/hebbot/tree/e1f43fbadf2bd284d78c270c0fe8ef231c8a7978/doc)
 - unstable [development builds](https://github.com/haecker-felix/hebbot/tree/master/doc)
 
-### Example usage
-Hebbot gets used to generate the weekly GNOME summaries ("This Week in GNOME"). More information, and usage examples can be found here: 
-- https://gitlab.gnome.org/World/twig
-- https://thisweek.gnome.org/
+### Example Usage
+- [This Week in GNOME](https://gitlab.gnome.org/World/twig) ([configuration](https://gitlab.gnome.org/World/twig/-/tree/main/hebbot))
+- [This Week in Matrix](https://matrix.org/blog/category/this-week-in-matrix) ([configuration](https://github.com/matrix-org/twim-config))
 
 If you know any other project which uses Hebbot and you think it should be get listed here, please open a PR!

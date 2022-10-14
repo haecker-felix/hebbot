@@ -1,9 +1,10 @@
 use chrono::Datelike;
-use matrix_sdk::ruma::MxcUri;
+use matrix_sdk::ruma::{EventId, OwnedMxcUri};
 use matrix_sdk::RoomMember;
 use regex::Regex;
 
 use std::collections::{BTreeMap, HashSet};
+use std::fmt::Write;
 
 use crate::{utils, Config, News, Project, Section};
 
@@ -29,8 +30,8 @@ pub struct RenderResult {
     pub rendered: String,
     pub warnings: Vec<String>,
     pub notes: Vec<String>,
-    pub images: Vec<(String, MxcUri)>,
-    pub videos: Vec<(String, MxcUri)>,
+    pub images: Vec<(String, OwnedMxcUri)>,
+    pub videos: Vec<(String, OwnedMxcUri)>,
 }
 
 pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> RenderResult {
@@ -42,8 +43,8 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     let mut rendered_report = String::new();
     let mut project_names: HashSet<String> = HashSet::new();
 
-    let mut images: Vec<(String, MxcUri)> = Vec::new();
-    let mut videos: Vec<(String, MxcUri)> = Vec::new();
+    let mut images: Vec<(String, OwnedMxcUri)> = Vec::new();
+    let mut videos: Vec<(String, OwnedMxcUri)> = Vec::new();
 
     let mut warnings: Vec<String> = Vec::new();
     let mut notes: Vec<String> = Vec::new();
@@ -157,7 +158,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
 
     // Sort `RenderProject`s into `RenderSection`s
     for (_, render_project) in render_projects {
-        let section_name = if let Some(ref section_name) = render_project.overwritten_section {
+        let section_name = if let Some(section_name) = &render_project.overwritten_section {
             section_name.clone()
         } else {
             render_project.project.default_section.clone()
@@ -192,7 +193,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     // Do the actual markdown rendering
     for (_, render_section) in sorted_render_sections {
         let rendered_section = render_section_md(&render_section, &config);
-        rendered_report += &format!("{}\n\n", rendered_section);
+        write!(rendered_report, "{}\n\n", rendered_section).unwrap();
     }
 
     // Create summary notes for the admin room
@@ -352,7 +353,7 @@ fn prepare_message(msg: String) -> String {
     let msg = matrix_rooms_re.replace_all(&msg, " [$1](https://matrix.to/#/$1)");
 
     // Turn <del> tags into markdown strikethrough
-    // NOTE: this does not work for nested tag, whih shouldn't really happen in Matrix IM anyway
+    // NOTE: this does not work for nested tag, which shouldn't really happen in Matrix IM anyway
     let strikethrough_re = Regex::new("<del>(.+?)</del>").unwrap();
     let msg = strikethrough_re.replace_all(&msg, "~~$1~~");
 
@@ -364,7 +365,7 @@ fn prepare_message(msg: String) -> String {
     msg.replace("> -", "> *")
 }
 
-fn message_link(config: &Config, event_id: &str) -> String {
+fn message_link(config: &Config, event_id: &EventId) -> String {
     let room_id = config.reporting_room_id.clone();
     format!(
         "<a href=\"https://matrix.to/#/{}/{}\">open message</a>",

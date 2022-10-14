@@ -1,3 +1,4 @@
+use matrix_sdk::ruma::{OwnedUserId, UserId};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -11,12 +12,14 @@ pub struct Config {
     pub reporting_room_id: String,
     pub admin_room_id: String,
     pub notice_emoji: String,
+    pub restrict_notice: bool,
     pub image_markdown: String,
     pub video_markdown: String,
     pub verbs: Vec<String>,
     pub min_length: usize,
+    pub ack_text: String,
     pub update_config_command: String,
-    pub editors: Vec<String>,
+    pub editors: Vec<OwnedUserId>,
     pub sections: Vec<Section>,
     pub projects: Vec<Project>,
 }
@@ -73,27 +76,10 @@ impl Config {
         ReactionType::None
     }
 
-    pub fn projects_by_usual_reporter(&self, reporter_mxid: &str) -> Vec<Project> {
-        let mut projects_for_this_reporter = Vec::<Project>::new();
-        for project in &self.projects {
-            if project
-                .usual_reporters
-                .contains(&String::from(reporter_mxid))
-            {
-                projects_for_this_reporter.push(project.clone())
-            }
-        }
-
-        projects_for_this_reporter
-    }
-
-    pub fn sections_by_usual_reporter(&self, reporter_mxid: &str) -> Vec<Section> {
+    pub fn sections_by_usual_reporter(&self, reporter: &UserId) -> Vec<Section> {
         let mut sections_for_this_reporter = Vec::<Section>::new();
         for section in &self.sections {
-            if section
-                .usual_reporters
-                .contains(&String::from(reporter_mxid))
-            {
+            if section.usual_reporters.contains(&reporter.to_owned()) {
                 sections_for_this_reporter.push(section.clone())
             }
         }

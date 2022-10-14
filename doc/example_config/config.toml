@@ -3,10 +3,13 @@ bot_user_id = '@botname:domain.org'
 reporting_room_id = '!roomid:domain.org'
 admin_room_id = '!adminroomid:domain.org'
 notice_emoji = '⭕'
+restrict_notice = true
 image_markdown = '> ![]({{file}})'
 video_markdown = '> {{< video src="{{file}}" >}}'
 verbs = ["reports", "says", "announces"]
 min_length = 30
+# Set to '' to disable text response
+ack_text = "✅ Thanks for the report {{user}}, I'll store your update!"
 update_config_command = "sh /data/update_config.sh"
 editors = [
     '@user1:domain.io',
@@ -34,10 +37,6 @@ title = 'Shortwave'
 description = 'Internet radio player with over 25000 stations.'
 website = 'https://gitlab.gnome.org/World/Shortwave'
 default_section = 'circle'
-usual_reporters = [
-    '@user1:domain.io',
-    '@user2:domain.com',
-]
 
 [[projects]]
 emoji = '⬇️'
@@ -46,4 +45,3 @@ title = 'Fragments'
 description = 'Easy to use BitTorrent client.'
 website = 'https://gitlab.gnome.org/World/Fragments'
 default_section = 'circle'
-usual_reporters = []

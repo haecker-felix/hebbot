@@ -2,18 +2,21 @@ use chrono::{DateTime, Utc};
 use matrix_sdk::config::SyncSettings;
 use matrix_sdk::event_handler::Ctx;
 use matrix_sdk::room::{Joined, Room};
-use matrix_sdk::ruma::events::reaction::{ReactionEventContent, Relation, SyncReactionEvent};
+use matrix_sdk::ruma::events::reaction::{
+    OriginalSyncReactionEvent, ReactionEventContent, Relation,
+};
 use matrix_sdk::ruma::events::room::message::{
-    FileMessageEventContent, MessageType, RoomMessageEventContent, SyncRoomMessageEvent,
+    FileMessageEventContent, MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent,
 };
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
+use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::AnyRoomEvent;
-use matrix_sdk::ruma::{EventId, MxcUri, RoomId, UserId};
-use matrix_sdk::uuid::Uuid;
+use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, UserId};
 use matrix_sdk::{Client, RoomMember};
+use regex::Regex;
 
-use std::convert::TryFrom;
 use std::env;
+use std::fmt::Write;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
@@ -38,14 +41,14 @@ impl Bot {
         let username = config.bot_user_id.as_str();
         let password = env::var("BOT_PASSWORD").expect("BOT_PASSWORD env variable not specified");
 
-        let user = UserId::try_from(username).expect("Unable to parse bot user id");
-        let client = Client::new_from_user_id(&user).await.unwrap();
+        let user = UserId::parse(username).expect("Unable to parse bot user id");
+        let client = Client::builder().user_id(&user).build().await.unwrap();
 
         Self::login(&client, user.localpart(), &password).await;
 
         // Get matrix rooms IDs
-        let reporting_room_id = RoomId::try_from(config.reporting_room_id.as_str()).unwrap();
-        let admin_room_id = RoomId::try_from(config.admin_room_id.as_str()).unwrap();
+        let reporting_room_id = RoomId::parse(config.reporting_room_id.as_str()).unwrap();
+        let admin_room_id = RoomId::parse(config.admin_room_id.as_str()).unwrap();
 
         // Try to accept reporting room invite, if any
         if let Some(invited_room) = client.get_invited_room(&reporting_room_id) {
@@ -152,9 +155,7 @@ impl Bot {
             BotMsgType::ReportingRoomPlainNotice => (&self.reporting_room, RoomMessageEventContent::notice_plain(msg)),
         };
 
-        let txn_id = Uuid::new_v4();
-
-        room.send(content, Some(txn_id))
+        room.send(content, None)
             .await
             .expect("Unable to send message");
     }
@@ -162,10 +163,9 @@ impl Bot {
     /// Simplified method for sending a reaction emoji
     async fn send_reaction(&self, reaction: &str, msg_event_id: &EventId) {
         let content =
-            ReactionEventContent::new(Relation::new(msg_event_id.clone(), reaction.to_string()));
-        let txn_id = Uuid::new_v4();
+            ReactionEventContent::new(Relation::new(msg_event_id.to_owned(), reaction.to_string()));
 
-        if let Err(err) = self.reporting_room.send(content, Some(txn_id)).await {
+        if let Err(err) = self.reporting_room.send(content, None).await {
             warn!(
                 "Could not send {} reaction to msg {}: {}",
                 reaction,
@@ -176,13 +176,12 @@ impl Bot {
     }
 
     /// Simplified method for sending a file
-    async fn send_file(&self, url: MxcUri, filename: String, admin_room: bool) {
+    async fn send_file(&self, url: OwnedMxcUri, filename: String, admin_room: bool) {
         debug!("Send file (url: {:?}, admin-room: {:?})", url, admin_room);
 
         let file_content = FileMessageEventContent::plain(filename, url, None);
         let msgtype = MessageType::File(file_content);
         let content = RoomMessageEventContent::new(msgtype);
-        let txn_id = Uuid::new_v4();
 
         let room = if admin_room {
             &self.admin_room
@@ -190,14 +189,12 @@ impl Bot {
             &self.reporting_room
         };
 
-        room.send(content, Some(txn_id))
-            .await
-            .expect("Unable to send file");
+        room.send(content, None).await.expect("Unable to send file");
     }
 
     /// Handling room messages events
-    async fn on_room_message(event: SyncRoomMessageEvent, room: Room, Ctx(bot): Ctx<Bot>) {
-        if let Room::Joined(ref _joined) = room {
+    async fn on_room_message(event: OriginalSyncRoomMessageEvent, room: Room, Ctx(bot): Ctx<Bot>) {
+        if let Room::Joined(_joined) = &room {
             // Standard text message
             if let Some(text) = utils::get_message_event_text(&event) {
                 let member = room.get_member(&event.sender).await.unwrap().unwrap();
@@ -227,13 +224,13 @@ impl Bot {
     }
 
     /// Handling room reaction events
-    async fn on_room_reaction(event: SyncReactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
-        if let Room::Joined(ref _joined) = room {
+    async fn on_room_reaction(event: OriginalSyncReactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
+        if let Room::Joined(_joined) = &room {
             let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
             let reaction_event_id = event.event_id.clone();
             let relation = &event.content.relates_to;
             let related_event_id = relation.event_id.clone();
-            let emoji = &relation.emoji.replace('\u{fe0f}', "");
+            let emoji = &relation.key.replace('\u{fe0f}', "");
 
             if let Some(related_event) = utils::room_event_by_id(&room, &related_event_id).await {
                 if let Some(related_msg_type) = utils::message_type(&related_event).await {
@@ -252,13 +249,13 @@ impl Bot {
                 } else {
                     debug!(
                         "Reaction related message isn't a room message (id {})",
-                        related_event_id.to_string()
+                        related_event_id
                     );
                 }
             } else {
                 warn!(
                     "Couldn't get reaction related event (id {})",
-                    related_event_id.to_string()
+                    related_event_id
                 );
             }
         }
@@ -266,14 +263,18 @@ impl Bot {
 
     /// Handling room redaction events (= something got removed/reverted)
     async fn on_room_redaction(event: SyncRoomRedactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
-        if let Room::Joined(ref _joined) = room {
-            let redacted_event_id = event.redacts.clone();
-            let member = room.get_member(&event.sender).await.unwrap().unwrap();
+        // FIXME: Function parameter should be OriginalSyncRoomRedactionEvent.
+        // Doesn't currently compile, needs a fix in the matrix-rust-sdk.
+        if let SyncRoomRedactionEvent::Original(event) = event {
+            if let Room::Joined(_joined) = &room {
+                let redacted_event_id = event.redacts.clone();
+                let member = room.get_member(&event.sender).await.unwrap().unwrap();
 
-            // Reporting room
-            if room.room_id() == bot.reporting_room.room_id() {
-                bot.on_reporting_room_redaction(&member, &redacted_event_id)
-                    .await;
+                // Reporting room
+                if room.room_id() == bot.reporting_room.room_id() {
+                    bot.on_reporting_room_redaction(&member, &redacted_event_id)
+                        .await;
+                }
             }
         }
     }
@@ -289,17 +290,18 @@ impl Bot {
     ) {
         // We're going to ignore all messages, expect it mentions the bot at the beginning
         let bot_id = self.client.user_id().await.unwrap();
-        if !utils::msg_starts_with_mention(bot_id, message.clone()) {
+        let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
+        if !utils::msg_starts_with_mention(&bot_id, bot_display_name, message.clone()) {
             return;
         }
 
-        let reporter_id = member.user_id().to_string();
+        let reporter_id = member.user_id();
         let reporter_display_name = utils::get_member_display_name(member);
 
         // Create new news entry...
         let news = News::new(
-            event_id.clone().to_string(),
-            reporter_id.clone(),
+            event_id.to_owned(),
+            reporter_id.to_owned(),
             reporter_display_name,
             message,
         );
@@ -314,14 +316,14 @@ impl Bot {
         updated_message: String,
         edited_msg_event_id: &EventId,
     ) {
-        let event_id = edited_msg_event_id.to_string();
-        let bot = self.client.user_id().await.unwrap();
-        let updated_message = utils::remove_bot_name(&updated_message, &bot);
-        let link = self.message_link(edited_msg_event_id.to_string());
+        let bot_id = self.client.user_id().await.unwrap();
+        let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
+        let updated_message = utils::remove_bot_name(&bot_id, bot_display_name, &updated_message);
+        let link = self.message_link(edited_msg_event_id);
 
         let message = {
             let news_store = self.news_store.lock().unwrap();
-            let msg = if let Some(news) = news_store.news_by_message_id(&event_id) {
+            let msg = if let Some(news) = news_store.news_by_message_id(edited_msg_event_id) {
                 news.set_message(updated_message);
                 if news.is_assigned() {
                     Some(format!(
@@ -358,25 +360,29 @@ impl Bot {
         related_event: &AnyRoomEvent,
         related_message_type: &MessageType,
     ) {
+        let reaction_emoji = reaction_emoji.strip_suffix('?').unwrap_or(reaction_emoji);
+
         // Only allow editors to use general commands
         // or the general public to use the notice emoji
+        let sender_is_hebbot = reaction_sender.user_id().as_str() == self.config.bot_user_id;
         let sender_is_editor = self.is_editor(reaction_sender).await;
-        if reaction_sender.user_id().as_str() == self.config.bot_user_id
-            || (!sender_is_editor && !utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji))
+        if sender_is_hebbot
+            || (self.config.restrict_notice
+                && !sender_is_editor
+                && !utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji))
         {
             return;
         }
 
         let message: Option<String> = {
-            let reaction_event_id = reaction_event_id.to_string();
             let reaction_type = self.config.reaction_type_by_emoji(reaction_emoji);
-            let related_event_id = related_event.event_id().to_string();
+            let related_event_id = related_event.event_id();
             let related_event_timestamp: DateTime<Utc> = related_event
                 .origin_server_ts()
                 .to_system_time()
                 .unwrap()
                 .into();
-            let link = self.message_link(related_event_id.clone());
+            let link = self.message_link(related_event_id);
 
             if reaction_type == ReactionType::None {
                 debug!(
@@ -398,6 +404,13 @@ impl Bot {
                             .unwrap()
                             .unwrap();
 
+                        if !sender_is_editor
+                            && (reaction_sender.user_id() != related_event_sender.user_id()
+                                && self.config.restrict_notice)
+                        {
+                            return;
+                        }
+
                         if let Some(news) =
                             utils::create_news_by_event(related_event, &related_event_sender)
                         {
@@ -417,12 +430,12 @@ impl Bot {
                         .news_store
                         .lock()
                         .unwrap()
-                        .news_by_message_id(&related_event_id)
+                        .news_by_message_id(related_event_id)
                     {
                         match reaction_type {
                             ReactionType::Section(section) => {
                                 let section = section.unwrap();
-                                news.add_section_name(reaction_event_id, section.name);
+                                news.add_section_name(reaction_event_id.to_owned(), section.name);
                                 Some(format!(
                                     "✅ Editor {} added {}’s news entry [{}] to the “{}” section.",
                                     reaction_sender.user_id(),
@@ -433,7 +446,7 @@ impl Bot {
                             }
                             ReactionType::Project(project) => {
                                 let project = project.unwrap();
-                                news.add_project_name(reaction_event_id, project.name);
+                                news.add_project_name(reaction_event_id.to_owned(), project.name);
                                 Some(format!(
                                     "✅ Editor {} added the project description “{}” to {}’s news entry [{}].",
                                     reaction_sender.user_id(),
@@ -459,15 +472,21 @@ impl Bot {
                 // Check if related message is an image
                 MessageType::Image(image) => match reaction_type {
                     ReactionType::Notice => {
-                        let reporter_id = reaction_sender.user_id().to_string();
+                        let reporter_id = reaction_sender.user_id();
                         let news_store = self.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
                             related_event.sender().as_ref(),
                             &related_event_timestamp,
                         ) {
-                            if let Some(mxc_uri) = &image.url {
+                            if !sender_is_editor
+                                && (reaction_sender.user_id() != related_event.sender()
+                                    && self.config.restrict_notice)
+                            {
+                                return;
+                            }
+                            if let MediaSource::Plain(mxc_uri) = &image.source {
                                 news.add_image(
-                                    reaction_event_id,
+                                    reaction_event_id.to_owned(),
                                     image.body.clone(),
                                     mxc_uri.clone(),
                                 );
@@ -498,15 +517,15 @@ impl Bot {
                 // Check if related message is a video
                 MessageType::Video(video) => match reaction_type {
                     ReactionType::Notice => {
-                        let reporter_id = reaction_sender.user_id().to_string();
+                        let reporter_id = reaction_sender.user_id();
                         let news_store = self.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
                             related_event.sender().as_ref(),
                             &related_event_timestamp,
                         ) {
-                            if let Some(mxc_uri) = &video.url {
+                            if let MediaSource::Plain(mxc_uri) = &video.source {
                                 news.add_video(
-                                    reaction_event_id,
+                                    reaction_event_id.to_owned(),
                                     video.body.clone(),
                                     mxc_uri.clone(),
                                 );
@@ -561,11 +580,11 @@ impl Bot {
         let message = {
             let is_editor = self.is_editor(member).await;
             let mut news_store = self.news_store.lock().unwrap();
-            let redacted_event_id = redacted_event_id.to_string();
-            let link = self.message_link(redacted_event_id.clone());
+            let redacted_event_id = redacted_event_id;
+            let link = self.message_link(redacted_event_id);
 
             // Redaction / deletion of the news entry itself
-            let msg = if let Ok(news) = news_store.remove_news(&redacted_event_id) {
+            let msg = if let Ok(news) = news_store.remove_news(redacted_event_id) {
                 Some(format!(
                     "✅ {}’s news entry got deleted by {}",
                     news.reporter_id,
@@ -575,8 +594,8 @@ impl Bot {
             } else if !is_editor {
                 None
             // Redaction of reaction events (project / section)
-            } else if let Some(news) = news_store.news_by_reaction_id(&redacted_event_id.clone()) {
-                let reaction_type = news.remove_reaction_id(&redacted_event_id);
+            } else if let Some(news) = news_store.news_by_reaction_id(redacted_event_id) {
+                let reaction_type = news.remove_reaction_id(redacted_event_id);
                 if reaction_type != ReactionType::None {
                     Some(format!(
                         "✅ Editor {} removed {} from {}’s news entry ({}).",
@@ -734,10 +753,12 @@ impl Bot {
 
         let mut list = String::new();
         for e in config.projects {
-            list += &format!(
-                "{}: {} - {} ({})\n",
+            writeln!(
+                list,
+                "{}: {} - {} ({})",
                 e.emoji, e.title, e.description, e.website
-            );
+            )
+            .unwrap();
         }
 
         let msg = format!("List of projects:\n<pre><code>{}</code></pre>\n", list);
@@ -750,7 +771,7 @@ impl Bot {
 
         let mut list = String::new();
         for e in config.sections {
-            list += &format!("{}: {}\n", e.emoji, e.title);
+            writeln!(list, "{}: {}", e.emoji, e.title).unwrap();
         }
 
         let msg = format!("List of sections:\n<pre><code>{}</code></pre>\n", list);
@@ -813,7 +834,7 @@ impl Bot {
                         uri.media_id().unwrap()
                     );
 
-                    curl_command += &format!(" {} -o {}", url, filename);
+                    write!(curl_command, " {} -o {}", url, filename).unwrap();
                 }
             }
 
@@ -846,15 +867,25 @@ impl Bot {
             let mut unassigned_list = String::new();
 
             for n in &news {
-                let link = self.message_link(n.event_id.clone());
+                let link = self.message_link(&n.event_id);
                 let summary = n.message_summary();
 
                 if n.is_assigned() {
                     assigned_count += 1;
-                    assigned_list += &format!("- [{}] {}: {} <br>", link, n.reporter_id, summary);
+                    write!(
+                        assigned_list,
+                        "- [{}] {}: {} <br>",
+                        link, n.reporter_id, summary
+                    )
+                    .unwrap();
                 } else {
                     unassigned_count += 1;
-                    unassigned_list += &format!("- [{}] {}: {} <br>", link, n.reporter_id, summary);
+                    write!(
+                        unassigned_list,
+                        "- [{}] {}: {} <br>",
+                        link, n.reporter_id, summary
+                    )
+                    .unwrap();
                 }
             }
 
@@ -898,7 +929,7 @@ impl Bot {
     }
 
     async fn add_news(&self, news: News, notify_reporter: bool) {
-        let link = self.message_link(news.event_id.to_string());
+        let link = self.message_link(&news.event_id);
 
         // Check if the news already exists
         if self
@@ -928,8 +959,7 @@ impl Bot {
                     "✅ Thanks for the report {}, I'll store your update!",
                     news.reporter_display_name
                 );
-                self.send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
-                    .await;
+                self.send_message(&msg, BotMsgType::ReportingRoomPlainNotice).await;
             }
 
             let msg = format!("✅ {} submitted a news entry. [{}]", news.reporter_id, link);
@@ -937,19 +967,20 @@ impl Bot {
                 .await;
 
             // Pre-populate with emojis to facilitate the editor's work
-            for project in self.config.projects_by_usual_reporter(&news.reporter_id) {
-                self.send_reaction(
-                    &project.emoji,
-                    &EventId::try_from(news.event_id.as_str()).unwrap(),
-                )
-                .await;
+            for project in &self.config.projects {
+                let regex = Regex::new(&format!(
+                    "(?i)\\b{}\\b|\\b{}\\b",
+                    project.name, project.title,
+                ))
+                .unwrap();
+                if regex.is_match(&news.message()) {
+                    self.send_reaction(&format!("{}?", &project.emoji), &news.event_id)
+                        .await;
+                }
             }
             for section in self.config.sections_by_usual_reporter(&news.reporter_id) {
-                self.send_reaction(
-                    &section.emoji,
-                    &EventId::try_from(news.event_id.as_str()).unwrap(),
-                )
-                .await;
+                self.send_reaction(&section.emoji, &EventId::parse(&news.event_id).unwrap())
+                    .await;
             }
 
             // Save it in message store
@@ -965,11 +996,11 @@ impl Bot {
     }
 
     async fn is_editor(&self, member: &RoomMember) -> bool {
-        let user_id = member.user_id().to_string();
+        let user_id = member.user_id().to_owned();
         self.config.editors.contains(&user_id)
     }
 
-    fn message_link(&self, event_id: String) -> String {
+    fn message_link(&self, event_id: &EventId) -> String {
         let room_id = self.config.reporting_room_id.clone();
         format!(
             "<a href=\"https://matrix.to/#/{}/{}\">open message</a>",
