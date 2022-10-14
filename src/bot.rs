@@ -316,8 +316,9 @@ impl Bot {
         updated_message: String,
         edited_msg_event_id: &EventId,
     ) {
-        let bot = self.client.user_id().await.unwrap();
-        let updated_message = utils::remove_bot_name(&updated_message, &bot);
+        let bot_id = self.client.user_id().await.unwrap();
+        let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
+        let updated_message = utils::remove_bot_name(&bot_id, bot_display_name, &updated_message);
         let link = self.message_link(edited_msg_event_id);
 
         let message = {
@@ -964,7 +965,8 @@ impl Bot {
 
             // remove bot name from message
             let bot_id = self.client.user_id().await.unwrap();
-            news.set_message(utils::remove_bot_name(&news.message(), &bot_id));
+            let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
+            news.set_message(utils::remove_bot_name(&bot_id, bot_display_name, &news.message()));
 
             // Pre-populate with emojis to facilitate the editor's work
             for project in &self.config.projects {

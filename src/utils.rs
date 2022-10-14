@@ -133,11 +133,20 @@ pub fn emoji_cmp(a: &str, b: &str) -> bool {
 }
 
 /// Remove bot name from message
-pub fn remove_bot_name(message: &str, bot: &UserId) -> String {
+pub fn remove_bot_name(bot: &UserId, display_name: Option<String>, msg: &str) -> String {
+    // remove user id
     let regex = format!("(?i)^@?{}(:{})?:?", bot.localpart(), bot.server_name());
     let re = Regex::new(&regex).unwrap();
-    let message = re.replace(message, "");
-    message.trim().to_string()
+    let mut msg = re.replace(msg, "").to_string();
+
+    // remove display name
+    if let Some(display_name) = display_name{
+        let regex = format!("(?i)^{}:?", display_name);
+        let re = Regex::new(&regex).unwrap();
+        msg = re.replace(&msg, "").to_string();
+    }
+
+    msg.trim().to_string()
 }
 
 pub fn format_messages(is_warning: bool, list: &[String]) -> String {
