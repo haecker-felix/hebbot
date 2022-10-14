@@ -105,11 +105,24 @@ pub fn get_member_display_name(member: &BaseRoomMember) -> String {
 
 /// Checks if a message starts with a user_id mention
 /// Automatically handles @ in front of the name
-pub fn msg_starts_with_mention(user_id: &UserId, msg: String) -> bool {
+pub fn msg_starts_with_mention(
+    user_id: &UserId,
+    display_name: Option<String>,
+    msg: String,
+) -> bool {
     let localpart = user_id.localpart().to_lowercase();
     // Catch "@botname ..." messages
     let msg = msg.replace(&format!("@{}", localpart), &localpart);
-    msg.as_str().to_lowercase().starts_with(&localpart)
+    let msg = msg.as_str().to_lowercase();
+
+    let matches_localpart = msg.starts_with(&localpart);
+    let matches_display_name = if let Some(display_name) = display_name {
+        msg.starts_with(&display_name.to_lowercase())
+    } else {
+        false
+    };
+
+    matches_localpart || matches_display_name
 }
 
 /// Returns `true` if the emojis are matching

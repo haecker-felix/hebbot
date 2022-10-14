@@ -290,7 +290,8 @@ impl Bot {
     ) {
         // We're going to ignore all messages, expect it mentions the bot at the beginning
         let bot_id = self.client.user_id().await.unwrap();
-        if !utils::msg_starts_with_mention(&bot_id, message.clone()) {
+        let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
+        if !utils::msg_starts_with_mention(&bot_id, bot_display_name, message.clone()) {
             return;
         }
 
