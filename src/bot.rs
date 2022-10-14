@@ -966,7 +966,11 @@ impl Bot {
             // remove bot name from message
             let bot_id = self.client.user_id().await.unwrap();
             let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
-            news.set_message(utils::remove_bot_name(&bot_id, bot_display_name, &news.message()));
+            news.set_message(utils::remove_bot_name(
+                &bot_id,
+                bot_display_name,
+                &news.message(),
+            ));
 
             // Pre-populate with emojis to facilitate the editor's work
             for project in &self.config.projects {

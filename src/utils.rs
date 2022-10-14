@@ -140,7 +140,7 @@ pub fn remove_bot_name(bot: &UserId, display_name: Option<String>, msg: &str) ->
     let mut msg = re.replace(msg, "").to_string();
 
     // remove display name
-    if let Some(display_name) = display_name{
+    if let Some(display_name) = display_name {
         let regex = format!("(?i)^{}:?", display_name);
         let re = Regex::new(&regex).unwrap();
         msg = re.replace(&msg, "").to_string();
