@@ -951,7 +951,11 @@ impl Bot {
         // remove bot name from message before we check length
         let bot_id = self.client.user_id().await.unwrap();
         let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
-        news.set_message(utils::remove_bot_name(&bot_id, bot_display_name, &news.message()));
+        news.set_message(utils::remove_bot_name(
+            &bot_id,
+            bot_display_name,
+            &news.message(),
+        ));
 
         // Check min message length
         if news.message().len() > self.config.min_length {
