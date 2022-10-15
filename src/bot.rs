@@ -366,7 +366,7 @@ impl Bot {
         related_event: &AnyTimelineEvent,
         related_message_type: &MessageType,
     ) {
-        let reaction_emoji = reaction_emoji.strip_suffix('?').unwrap_or(reaction_emoji);
+        let reaction_emoji = reaction_emoji.strip_suffix(" ?").unwrap_or(reaction_emoji);
 
         // Only allow editors to use general commands
         // or the general public to use the notice emoji
@@ -987,7 +987,7 @@ impl Bot {
                 ))
                 .unwrap();
                 if regex.is_match(&news.message()) {
-                    self.send_reaction(&format!("{}?", &project.emoji), &news.event_id)
+                    self.send_reaction(&format!("{} ?", &project.emoji), &news.event_id)
                         .await;
                 }
             }
