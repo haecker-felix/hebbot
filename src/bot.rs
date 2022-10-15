@@ -1,8 +1,7 @@
 use chrono::{DateTime, Utc};
-use matrix_sdk::config::SyncSettings;
+use matrix_sdk::config::{RequestConfig, SyncSettings};
 use matrix_sdk::event_handler::Ctx;
-use matrix_sdk::room::RoomMember;
-use matrix_sdk::room::{Joined, Room};
+use matrix_sdk::room::{Joined, Room, RoomMember};
 use matrix_sdk::ruma::events::reaction::{
     OriginalSyncReactionEvent, ReactionEventContent, Relation,
 };
@@ -44,8 +43,10 @@ impl Bot {
 
         let user = UserId::parse(username).expect("Unable to parse bot user id");
         let server_name = ServerName::parse(user.server_name()).unwrap();
+        let request_config = RequestConfig::new().force_auth();
         let client = Client::builder()
             .server_name(&server_name)
+            .request_config(request_config)
             .build()
             .await
             .unwrap();
@@ -1020,4 +1021,3 @@ impl Bot {
         )
     }
 }
-

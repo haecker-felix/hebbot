@@ -372,4 +372,3 @@ fn message_link(config: &Config, event_id: &EventId) -> String {
         room_id, event_id
     )
 }
-

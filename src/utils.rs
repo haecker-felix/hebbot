@@ -1,6 +1,5 @@
 use async_process::{Command, Stdio};
-use matrix_sdk::room::Room;
-use matrix_sdk::room::RoomMember;
+use matrix_sdk::room::{Room, RoomMember};
 use matrix_sdk::ruma::events::room::message::{
     MessageType, NoticeMessageEventContent, OriginalSyncRoomMessageEvent, Relation,
     RoomMessageEventContent, TextMessageEventContent,
@@ -201,4 +200,3 @@ pub fn file_from_env(env_var_name: &str, fallback: &str) -> String {
 
     template
 }
-
