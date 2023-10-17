@@ -8,16 +8,16 @@ name: rustfmt
 jobs:
   fmt:
     name: Rustfmt
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.2
         with:
+          command: install-rustup
           profile: minimal
           toolchain: stable
           override: true
-      - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
+      - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.2
         with:
-          command: fmt
+          command: cargo fmt
           args: --all -- --check
