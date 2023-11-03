@@ -47,7 +47,15 @@ impl News {
 
     pub fn message_summary(&self) -> String {
         if self.message.borrow().len() > 60 {
-            format!("{} …", self.message.borrow().clone().split_at(50).0)
+            format!(
+                "{} …",
+                self.message
+                    .borrow()
+                    .clone()
+                    .chars()
+                    .take(50)
+                    .collect::<String>()
+            )
         } else {
             self.message.borrow().clone()
         }

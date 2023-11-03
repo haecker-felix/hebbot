@@ -586,7 +586,6 @@ impl Bot {
         let message = {
             let is_editor = self.is_editor(member).await;
             let mut news_store = self.news_store.lock().unwrap();
-            let redacted_event_id = redacted_event_id;
             let link = self.message_link(redacted_event_id);
 
             // Redaction / deletion of the news entry itself
