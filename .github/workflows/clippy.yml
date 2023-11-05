@@ -8,17 +8,18 @@ name: clippy
 jobs:
   clippy:
     name: clippy
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.2
         with:
+          command: install-rustup
           profile: minimal
           toolchain: stable
           override: true
-      - run: rustup component add clippy
-      - uses: actions-rs/cargo@v1
+      - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.2
         with:
-          command: clippy
+          command: cargo clippy
           args: -- -D warnings
+          annotations: true
 
