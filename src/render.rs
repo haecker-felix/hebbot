@@ -330,11 +330,11 @@ fn render_news_md(news: &News, config: &Config) -> String {
     // Insert images/videos into markdown > quote, separating it from any elements before it
     for (filename, _) in news.images() {
         let image = config.image_markdown.replace("{{file}}", &filename);
-        news_md += &("\n>" + image.clone() + "\n");
+        news_md += &("\n>".to_owned() + &image.clone() + "\n");
     }
     for (filename, _) in news.videos() {
         let video = config.video_markdown.replace("{{file}}", &filename);
-        news_md += &("\n>" + video.clone() + "\n");
+        news_md += &("\n>".to_owned() + &video.clone() + "\n");
     }
 
     news_md += "\n";
