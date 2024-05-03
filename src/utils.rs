@@ -193,7 +193,8 @@ pub fn file_from_env(env_var_name: &str, fallback: &str) -> String {
 
     debug!("Trying to read file from path: {:?}", path);
 
-    let mut file = File::open(path).expect("Unable to open file");
+    let mut file =
+        File::open(path.clone()).expect(&format!("Unable to open file: {path} ({env_var_name})"));
     let mut template = String::new();
     file.read_to_string(&mut template)
         .expect("Unable to read file");
