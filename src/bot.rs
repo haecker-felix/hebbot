@@ -1,18 +1,29 @@
 use chrono::{DateTime, Utc};
-use matrix_sdk::config::{RequestConfig, SyncSettings};
-use matrix_sdk::event_handler::Ctx;
-use matrix_sdk::room::{Joined, Room, RoomMember};
-use matrix_sdk::ruma::events::reaction::{
-    OriginalSyncReactionEvent, ReactionEventContent, Relation,
+
+use matrix_sdk::{
+    config::{RequestConfig, SyncSettings},
+    event_handler::Ctx,
+    room::RoomMember,
+    ruma::{
+        events::{
+            reaction::OriginalSyncReactionEvent,
+            reaction::ReactionEventContent,
+            relation::Annotation,
+            room::{
+                message::{
+                    FileMessageEventContent, MessageType, OriginalSyncRoomMessageEvent,
+                    RoomMessageEventContent,
+                },
+                redaction::SyncRoomRedactionEvent,
+                MediaSource,
+            },
+            AnyTimelineEvent,
+        },
+        EventId, OwnedMxcUri, RoomId, ServerName, UserId,
+    },
+    Client, Room, RoomState,
 };
-use matrix_sdk::ruma::events::room::message::{
-    FileMessageEventContent, MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent,
-};
-use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
-use matrix_sdk::ruma::events::room::MediaSource;
-use matrix_sdk::ruma::events::AnyTimelineEvent;
-use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, ServerName, UserId};
-use matrix_sdk::Client;
+
 use regex::Regex;
 
 use std::env;
@@ -28,8 +39,8 @@ pub struct Bot {
     config: Config,
     news_store: Arc<Mutex<NewsStore>>,
     client: Client,
-    reporting_room: Joined,
-    admin_room: Joined,
+    reporting_room: Room,
+    admin_room: Room,
 }
 
 impl Bot {
@@ -58,19 +69,18 @@ impl Bot {
         let admin_room_id = RoomId::parse(config.admin_room_id.as_str()).unwrap();
 
         // Try to accept reporting room invite, if any
-        if let Some(invited_room) = client.get_invited_room(&reporting_room_id) {
-            invited_room
-                .accept_invitation()
-                .await
-                .expect("Hebbot could not join the reporting room");
-        }
-
-        // Try to accept admin room invite, if any
-        if let Some(invited_room) = client.get_invited_room(&admin_room_id) {
-            invited_room
-                .accept_invitation()
-                .await
-                .expect("Hebbot could not join the admin room");
+        for room in client.invited_rooms() {
+            if room.room_id() == reporting_room_id {
+                room.join()
+                    .await
+                    .expect("Hebbot could not join the reporting room");
+            } else if room.room_id() == admin_room_id {
+                room.join()
+                    .await
+                    .expect("Hebbot could not join the admin room");
+            } else {
+                info!("Ignored room: {}", room.room_id());
+            }
         }
 
         // Sync to make sure that the bot is aware of the newly joined rooms
@@ -80,11 +90,11 @@ impl Bot {
             .expect("Unable to sync");
 
         let reporting_room = client
-            .get_joined_room(&reporting_room_id)
+            .get_room(&reporting_room_id)
             .expect("Unable to get reporting room");
 
         let admin_room = client
-            .get_joined_room(&admin_room_id)
+            .get_room(&admin_room_id)
             .expect("Unable to get admin room");
 
         let bot = Self {
@@ -127,9 +137,9 @@ impl Bot {
     async fn login(client: &Client, user: &str, pwd: &str) {
         info!("Logging in…");
         let response = client
+            .matrix_auth()
             .login_username(user, pwd)
             .initial_device_display_name("hebbot")
-            .send()
             .await
             .expect("Unable to login");
 
@@ -161,17 +171,17 @@ impl Bot {
             BotMsgType::ReportingRoomPlainNotice => (&self.reporting_room, RoomMessageEventContent::notice_plain(msg)),
         };
 
-        room.send(content, None)
-            .await
-            .expect("Unable to send message");
+        room.send(content).await.expect("Unable to send message");
     }
 
     /// Simplified method for sending a reaction emoji
     async fn send_reaction(&self, reaction: &str, msg_event_id: &EventId) {
-        let content =
-            ReactionEventContent::new(Relation::new(msg_event_id.to_owned(), reaction.to_string()));
+        let content = ReactionEventContent::new(Annotation::new(
+            msg_event_id.to_owned(),
+            reaction.to_string(),
+        ));
 
-        if let Err(err) = self.reporting_room.send(content, None).await {
+        if let Err(err) = self.reporting_room.send(content).await {
             warn!(
                 "Could not send {} reaction to msg {}: {}",
                 reaction,
@@ -185,7 +195,7 @@ impl Bot {
     async fn send_file(&self, url: OwnedMxcUri, filename: String, admin_room: bool) {
         debug!("Send file (url: {:?}, admin-room: {:?})", url, admin_room);
 
-        let file_content = FileMessageEventContent::plain(filename, url, None);
+        let file_content = FileMessageEventContent::plain(filename, url);
         let msgtype = MessageType::File(file_content);
         let content = RoomMessageEventContent::new(msgtype);
 
@@ -195,75 +205,78 @@ impl Bot {
             &self.reporting_room
         };
 
-        room.send(content, None).await.expect("Unable to send file");
+        room.send(content).await.expect("Unable to send file");
     }
 
     /// Handling room messages events
     async fn on_room_message(event: OriginalSyncRoomMessageEvent, room: Room, Ctx(bot): Ctx<Bot>) {
-        if let Room::Joined(_joined) = &room {
-            // Standard text message
-            if let Some(text) = utils::get_message_event_text(&event) {
-                let member = room.get_member(&event.sender).await.unwrap().unwrap();
-                let id = &event.event_id;
+        if room.state() != RoomState::Joined {
+            return;
+        }
 
-                // Reporting room
-                if room.room_id() == bot.reporting_room.room_id() {
-                    bot.on_reporting_room_msg(text.clone(), &member, id).await;
-                }
+        // Standard text message
+        if let Some(text) = utils::get_message_event_text(&event) {
+            let member = room.get_member(&event.sender).await.unwrap().unwrap();
+            let id = &event.event_id;
 
-                // Admin room
-                if room.room_id() == bot.admin_room.room_id() {
-                    bot.on_admin_room_message(text, &member).await;
-                }
+            // Reporting room
+            if room.room_id() == bot.reporting_room.room_id() {
+                bot.on_reporting_room_msg(text.clone(), &member, id).await;
             }
 
-            // Message edit
-            if let Some((edited_msg_event_id, text)) = utils::get_edited_message_event_text(&event)
-            {
-                // Reporting room
-                if room.room_id() == bot.reporting_room.room_id() {
-                    bot.on_reporting_room_msg_edit(text.clone(), &edited_msg_event_id)
-                        .await;
-                }
+            // Admin room
+            if room.room_id() == bot.admin_room.room_id() {
+                bot.on_admin_room_message(text, &member).await;
+            }
+        }
+
+        // Message edit
+        if let Some((edited_msg_event_id, text)) = utils::get_edited_message_event_text(&event) {
+            // Reporting room
+            if room.room_id() == bot.reporting_room.room_id() {
+                bot.on_reporting_room_msg_edit(text.clone(), &edited_msg_event_id)
+                    .await;
             }
         }
     }
 
     /// Handling room reaction events
     async fn on_room_reaction(event: OriginalSyncReactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
-        if let Room::Joined(_joined) = &room {
-            let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
-            let reaction_event_id = event.event_id.clone();
-            let relation = &event.content.relates_to;
-            let related_event_id = relation.event_id.clone();
-            let emoji = &relation.key.replace('\u{fe0f}', "");
+        if room.state() != RoomState::Joined {
+            return;
+        }
 
-            if let Some(related_event) = utils::room_event_by_id(&room, &related_event_id).await {
-                if let Some(related_msg_type) = utils::message_type(&related_event).await {
-                    // Reporting room
-                    if room.room_id() == bot.reporting_room.room_id() {
-                        bot.on_reporting_room_reaction(
-                            &room,
-                            &reaction_sender,
-                            emoji,
-                            &reaction_event_id,
-                            &related_event,
-                            &related_msg_type,
-                        )
-                        .await;
-                    }
-                } else {
-                    debug!(
-                        "Reaction related message isn't a room message (id {})",
-                        related_event_id
-                    );
+        let reaction_sender = room.get_member(&event.sender).await.unwrap().unwrap();
+        let reaction_event_id = event.event_id.clone();
+        let relation = &event.content.relates_to;
+        let related_event_id = relation.event_id.clone();
+        let emoji = &relation.key.replace('\u{fe0f}', "");
+
+        if let Some(related_event) = utils::room_event_by_id(&room, &related_event_id).await {
+            if let Some(related_msg_type) = utils::message_type(&related_event).await {
+                // Reporting room
+                if room.room_id() == bot.reporting_room.room_id() {
+                    bot.on_reporting_room_reaction(
+                        &room,
+                        &reaction_sender,
+                        emoji,
+                        &reaction_event_id,
+                        &related_event,
+                        &related_msg_type,
+                    )
+                    .await;
                 }
             } else {
-                warn!(
-                    "Couldn't get reaction related event (id {})",
+                debug!(
+                    "Reaction related message isn't a room message (id {})",
                     related_event_id
                 );
             }
+        } else {
+            warn!(
+                "Couldn't get reaction related event (id {})",
+                related_event_id
+            );
         }
     }
 
@@ -272,15 +285,16 @@ impl Bot {
         // FIXME: Function parameter should be OriginalSyncRoomRedactionEvent.
         // Doesn't currently compile, needs a fix in the matrix-rust-sdk.
         if let SyncRoomRedactionEvent::Original(event) = event {
-            if let Room::Joined(_joined) = &room {
-                let redacted_event_id = event.redacts.clone();
-                let member = room.get_member(&event.sender).await.unwrap().unwrap();
+            if room.state() != RoomState::Joined {
+                return;
+            }
+            let redacted_event_id = event.redacts.clone().unwrap();
+            let member = room.get_member(&event.sender).await.unwrap().unwrap();
 
-                // Reporting room
-                if room.room_id() == bot.reporting_room.room_id() {
-                    bot.on_reporting_room_redaction(&member, &redacted_event_id)
-                        .await;
-                }
+            // Reporting room
+            if room.room_id() == bot.reporting_room.room_id() {
+                bot.on_reporting_room_redaction(&member, &redacted_event_id)
+                    .await;
             }
         }
     }
@@ -794,7 +808,7 @@ impl Bot {
         };
 
         // Upload rendered content as markdown file
-        let bytes = result.rendered.as_bytes();
+        let bytes = result.rendered.into_bytes();
         let response = self
             .client
             .media()
@@ -835,7 +849,7 @@ impl Bot {
                 if uri.is_valid() {
                     let url = format!(
                         "{}_matrix/media/r0/download/{}/{}",
-                        self.client.homeserver().await,
+                        self.client.homeserver(),
                         uri.server_name().unwrap(),
                         uri.media_id().unwrap()
                     );
