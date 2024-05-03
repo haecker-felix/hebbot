@@ -1,28 +1,18 @@
 use chrono::{DateTime, Utc};
 
-use matrix_sdk::{
-    config::{RequestConfig, SyncSettings},
-    event_handler::Ctx,
-    room::RoomMember,
-    ruma::{
-        events::{
-            reaction::OriginalSyncReactionEvent,
-            reaction::ReactionEventContent,
-            relation::Annotation,
-            room::{
-                message::{
-                    FileMessageEventContent, MessageType, OriginalSyncRoomMessageEvent,
-                    RoomMessageEventContent,
-                },
-                redaction::SyncRoomRedactionEvent,
-                MediaSource,
-            },
-            AnyTimelineEvent,
-        },
-        EventId, OwnedMxcUri, RoomId, ServerName, UserId,
-    },
-    Client, Room, RoomState,
+use matrix_sdk::config::{RequestConfig, SyncSettings};
+use matrix_sdk::event_handler::Ctx;
+use matrix_sdk::room::RoomMember;
+use matrix_sdk::ruma::events::reaction::{OriginalSyncReactionEvent, ReactionEventContent};
+use matrix_sdk::ruma::events::relation::Annotation;
+use matrix_sdk::ruma::events::room::message::{
+    FileMessageEventContent, MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent,
 };
+use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
+use matrix_sdk::ruma::events::room::MediaSource;
+use matrix_sdk::ruma::events::AnyTimelineEvent;
+use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, ServerName, UserId};
+use matrix_sdk::{Client, Room, RoomState};
 
 use regex::Regex;
 
