@@ -15,8 +15,6 @@ jobs:
         with:
           command: install-rustup
           profile: minimal
-          toolchain: stable
-          override: true
       - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.2
         name: Cargo build
         with:
