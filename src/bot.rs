@@ -44,12 +44,14 @@ impl Bot {
         let user = UserId::parse(username).expect("Unable to parse bot user id");
         let server_name = ServerName::parse(user.server_name()).unwrap();
         let request_config = RequestConfig::new().force_auth();
-        let client = Client::builder()
+
+        let mut client_builder = Client::builder()
             .server_name(&server_name)
-            .request_config(request_config)
-            .build()
-            .await
-            .unwrap();
+            .request_config(request_config);
+        if let Ok(value) = env::var("HOMESERVER_URL") {
+            client_builder = client_builder.homeserver_url(value);
+        }
+        let client = client_builder.build().await.unwrap();
 
         Self::login(&client, user.localpart(), &password).await;
 

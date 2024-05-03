@@ -30,6 +30,8 @@ In order to use the bot, two configuration files are required. The `config.toml`
 
 The password for the bot is supplied via the `BOT_PASSWORD` environment variable. Setting this will depend on how you start the bot. 
 
+If the bot cannot determine the URL of the home server from the `bot_user_id` setting, it may be supplied by the `HOMESERVER_URL` environment variable.
+
 For both configuration files, examples are available that can be used as templates (see `example_config` folder). 
 
 More configuration examples:
