@@ -826,7 +826,7 @@ impl Bot {
         let response = self
             .client
             .media()
-            .upload(&mime::TEXT_PLAIN_UTF_8, bytes)
+            .upload(&mime::TEXT_PLAIN_UTF_8, bytes, None)
             .await
             .expect("Can't upload rendered file.");
 
