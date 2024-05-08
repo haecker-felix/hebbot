@@ -1,11 +1,13 @@
 use async_process::{Command, Stdio};
+use matrix_sdk::deserialized_responses::TimelineEventKind;
 use matrix_sdk::room::{Room, RoomMember};
 use matrix_sdk::ruma::events::room::message::{
     MessageType, NoticeMessageEventContent, OriginalSyncRoomMessageEvent, Relation,
     RoomMessageEventContent, TextMessageEventContent,
 };
 use matrix_sdk::ruma::events::{
-    AnyMessageLikeEvent, AnyTimelineEvent, MessageLikeEvent, OriginalMessageLikeEvent,
+    AnyMessageLikeEvent, AnySyncTimelineEvent, AnyTimelineEvent, MessageLikeEvent,
+    OriginalMessageLikeEvent,
 };
 use matrix_sdk::ruma::{EventId, OwnedEventId, UserId};
 use matrix_sdk::BaseRoomMember;
@@ -61,7 +63,25 @@ pub fn create_news_by_event(
 
 /// Get room message by event id
 pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyTimelineEvent> {
-    room.event(event_id).await.ok()?.event.deserialize().ok()
+    let timeline_event = room.event(event_id, None).await.ok()?;
+
+    match timeline_event.kind {
+        TimelineEventKind::PlainText { event } => match event.deserialize().ok() {
+            Some(AnySyncTimelineEvent::MessageLike(event)) => {
+                Some(event.into_full_event(room.room_id().into()).into())
+            }
+            Some(AnySyncTimelineEvent::State(event)) => {
+                Some(event.into_full_event(room.room_id().into()).into())
+            }
+            None => None,
+        },
+        ev => {
+            // This covers the other variants: DecryptedRoomEvent and UnableToDecrypt.
+            // At the moment Hebbot does not support being used in encrypted rooms.
+            warn!("Unsupported E2EE event: {ev:?}");
+            None
+        }
+    }
 }
 
 pub async fn message_type(room_event: &AnyTimelineEvent) -> Option<MessageType> {

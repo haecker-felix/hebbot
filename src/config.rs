@@ -86,8 +86,8 @@ impl Config {
     }
 
     pub fn random_verb(&self) -> String {
-        let mut rng = rand::thread_rng();
-        let id = rng.gen_range(0..self.verbs.len());
+        let mut rng = rand::rng();
+        let id = rng.random_range(0..self.verbs.len());
         self.verbs[id].to_string()
     }
 
