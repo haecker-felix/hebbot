@@ -11,13 +11,15 @@ serde_json = "1.0"
 url = "2.2"
 tokio = { version="1.7", features = ["macros"] }
 log = "0.4"
-pretty_env_logger = "0.4"
+pretty_env_logger = "0.5"
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1.5"
 rand = "0.8"
 mime = "0.3"
-toml = "0.5"
-async-process = "1.2"
+toml = "0.8"
+async-process = "2.2"
+minijinja = { version = "2.0.1", features = ["builtins", "debug", "deserialization", "json", "std_collections"] }
+minijinja-contrib = { version = "2.0.1", features = ["datetime"] }
 
 [features]
 default = [

@@ -2,13 +2,14 @@ use chrono::Datelike;
 use matrix_sdk::room::RoomMember;
 use matrix_sdk::ruma::{EventId, OwnedMxcUri};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write;
 
 use crate::{utils, Config, News, Project, Section};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct RenderProject {
     pub project: Project,
     pub news: Vec<News>,
@@ -17,7 +18,7 @@ struct RenderProject {
     pub overwritten_section: Option<String>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct RenderSection {
     pub section: Section,
     pub projects: Vec<RenderProject>,
@@ -34,13 +35,62 @@ pub struct RenderResult {
     pub videos: Vec<(String, OwnedMxcUri)>,
 }
 
+fn random_filter(value: minijinja::Value) -> Result<minijinja::Value, minijinja::Error> {
+    if let Some(len) = value.len() {
+        value.get_item_by_index(rand::random::<usize>() % len)
+    } else {
+        Ok(value)
+    }
+}
+
+fn render_template(
+    render_sections: &BTreeMap<String, RenderSection>,
+    config: &Config,
+    editor: &RoomMember,
+) -> Option<String> {
+    let path = match std::env::var("TEMPLATE_PATH") {
+        Ok(val) => val,
+        Err(_) => return None,
+    };
+
+    debug!("Reading template from file path: {:?}", path);
+    let text = match std::fs::File::open(path) {
+        Ok(mut f) => {
+            use std::io::Read;
+            let mut t = String::new();
+            f.read_to_string(&mut t).expect("Unable to read file");
+            t
+        }
+        Err(err) => {
+            debug!("Could not open file: {:?}", err);
+            return None;
+        }
+    };
+
+    let mut env = minijinja::Environment::new();
+    minijinja_contrib::add_to_environment(&mut env);
+    env.add_template("template", &text).unwrap();
+    env.add_filter("random", random_filter);
+
+    let template = env.get_template("template").unwrap();
+    let result = template
+        .render(minijinja::context! {
+            sections => render_sections,
+            config => config,
+            editor => utils::get_member_display_name(editor),
+        })
+        .unwrap();
+
+    println!("{}", result);
+    Some(result)
+}
+
 pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> RenderResult {
     let mut render_projects: BTreeMap<String, RenderProject> = BTreeMap::new();
     let mut render_sections: BTreeMap<String, RenderSection> = BTreeMap::new();
 
     let mut news_count = 0;
     let mut not_assigned = 0;
-    let mut rendered_report = String::new();
     let mut project_names: HashSet<String> = HashSet::new();
 
     let mut images: Vec<(String, OwnedMxcUri)> = Vec::new();
@@ -190,12 +240,6 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
         sorted_render_sections.insert(render_section.section.clone(), render_section.clone());
     }
 
-    // Do the actual markdown rendering
-    for (_, render_section) in sorted_render_sections {
-        let rendered_section = render_section_md(&render_section, &config);
-        write!(rendered_report, "{}\n\n", rendered_section).unwrap();
-    }
-
     // Create summary notes for the admin room
     if not_assigned != 0 {
         let note = format!(
@@ -217,37 +261,48 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     warnings.reverse();
     notes.reverse();
 
-    // Replace template variables with content
-    let display_name = utils::get_member_display_name(editor);
+    let rendered = if let Some(rendered_text) = render_template(&render_sections, &config, editor) {
+        rendered_text
+    } else {
+        let mut rendered_report = String::new();
+        // Do the actual markdown rendering
+        for (_, render_section) in sorted_render_sections {
+            let rendered_section = render_section_md(&render_section, &config);
+            write!(rendered_report, "{}\n\n", rendered_section).unwrap();
+        }
+        // Replace template variables with content
+        let display_name = utils::get_member_display_name(editor);
 
-    // Date for the blog
-    let now: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
-    let today = now.format("%Y-%m-%d").to_string();
-    let weeknumber = now.iso_week().week().to_string();
+        // Date for the blog
+        let now: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
+        let today = now.format("%Y-%m-%d").to_string();
+        let weeknumber = now.iso_week().week().to_string();
 
-    // Generate timespan text
-    let week_later = chrono::Utc::now() - chrono::Duration::days(7);
-    let end = now.format("%B %d").to_string();
-    let start = week_later.format("%B %d").to_string();
-    let timespan = format!("{} to {}", start, end);
+        // Generate timespan text
+        let week_later = chrono::Utc::now() - chrono::Duration::days(7);
+        let end = now.format("%B %d").to_string();
+        let start = week_later.format("%B %d").to_string();
+        let timespan = format!("{} to {}", start, end);
 
-    // Projects list (can be get used for hugo tags for example)
-    let mut projects = format!("{:?}", &project_names);
-    projects = projects.replace('{', "");
-    projects = projects.replace('}', "");
+        // Projects list (can be get used for hugo tags for example)
+        let mut projects = format!("{:?}", &project_names);
+        projects = projects.replace('{', "");
+        projects = projects.replace('}', "");
 
-    // Load the section template
-    let env_name = "REPORT_TEMPLATE_PATH";
-    let fallback = "./report_template.md";
-    let mut rendered = utils::file_from_env(env_name, fallback);
+        // Load the section template
+        let env_name = "REPORT_TEMPLATE_PATH";
+        let fallback = "./report_template.md";
+        let mut rendered = utils::file_from_env(env_name, fallback);
 
-    // Replace the template variables with values
-    rendered = rendered.replace("{{sections}}", rendered_report.trim());
-    rendered = rendered.replace("{{weeknumber}}", &weeknumber);
-    rendered = rendered.replace("{{timespan}}", &timespan);
-    rendered = rendered.replace("{{projects}}", &projects);
-    rendered = rendered.replace("{{today}}", &today);
-    rendered = rendered.replace("{{author}}", &display_name);
+        // Replace the template variables with values
+        rendered = rendered.replace("{{sections}}", rendered_report.trim());
+        rendered = rendered.replace("{{weeknumber}}", &weeknumber);
+        rendered = rendered.replace("{{timespan}}", &timespan);
+        rendered = rendered.replace("{{projects}}", &projects);
+        rendered = rendered.replace("{{today}}", &today);
+        rendered = rendered.replace("{{author}}", &display_name);
+        rendered
+    };
 
     RenderResult {
         rendered,
