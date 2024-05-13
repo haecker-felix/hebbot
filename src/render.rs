@@ -1,11 +1,8 @@
-use chrono::Datelike;
 use matrix_sdk::room::RoomMember;
 use matrix_sdk::ruma::{EventId, OwnedMxcUri};
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use std::collections::{BTreeMap, HashSet};
-use std::fmt::Write;
 
 use crate::{utils, Config, News, Project, Section};
 
@@ -43,36 +40,38 @@ fn random_filter(value: minijinja::Value) -> Result<minijinja::Value, minijinja:
     }
 }
 
+lazy_static::lazy_static! {
+    static ref TEMPLATE_TEXT: String = {
+        use std::io::Read;
+
+        let path = std::env::var("TEMPLATE_PATH").unwrap_or("template.md".into());
+        debug!("Reading template from file path: {:?}", path);
+
+        let mut text = String::new();
+        std::fs::File::open(path)
+            .expect("Unable to open template file")
+            .read_to_string(&mut text)
+            .expect("Unable to read template file");
+
+        text
+    };
+
+    static ref JINJA_ENV: minijinja::Environment<'static> = {
+        let mut env = minijinja::Environment::new();
+        minijinja_contrib::add_to_environment(&mut env);
+        env.add_template("template", &TEMPLATE_TEXT).unwrap();
+        env.add_filter("random", random_filter);
+        env
+    };
+}
+
 fn render_template(
     render_sections: &BTreeMap<String, RenderSection>,
     config: &Config,
     editor: &RoomMember,
 ) -> Option<String> {
-    let path = match std::env::var("TEMPLATE_PATH") {
-        Ok(val) => val,
-        Err(_) => return None,
-    };
+    let template = JINJA_ENV.get_template("template").unwrap();
 
-    debug!("Reading template from file path: {:?}", path);
-    let text = match std::fs::File::open(path) {
-        Ok(mut f) => {
-            use std::io::Read;
-            let mut t = String::new();
-            f.read_to_string(&mut t).expect("Unable to read file");
-            t
-        }
-        Err(err) => {
-            debug!("Could not open file: {:?}", err);
-            return None;
-        }
-    };
-
-    let mut env = minijinja::Environment::new();
-    minijinja_contrib::add_to_environment(&mut env);
-    env.add_template("template", &text).unwrap();
-    env.add_filter("random", random_filter);
-
-    let template = env.get_template("template").unwrap();
     let result = template
         .render(minijinja::context! {
             sections => render_sections,
@@ -261,48 +260,7 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     warnings.reverse();
     notes.reverse();
 
-    let rendered = if let Some(rendered_text) = render_template(&render_sections, &config, editor) {
-        rendered_text
-    } else {
-        let mut rendered_report = String::new();
-        // Do the actual markdown rendering
-        for (_, render_section) in sorted_render_sections {
-            let rendered_section = render_section_md(&render_section, &config);
-            write!(rendered_report, "{}\n\n", rendered_section).unwrap();
-        }
-        // Replace template variables with content
-        let display_name = utils::get_member_display_name(editor);
-
-        // Date for the blog
-        let now: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
-        let today = now.format("%Y-%m-%d").to_string();
-        let weeknumber = now.iso_week().week().to_string();
-
-        // Generate timespan text
-        let week_later = chrono::Utc::now() - chrono::Duration::days(7);
-        let end = now.format("%B %d").to_string();
-        let start = week_later.format("%B %d").to_string();
-        let timespan = format!("{} to {}", start, end);
-
-        // Projects list (can be get used for hugo tags for example)
-        let mut projects = format!("{:?}", &project_names);
-        projects = projects.replace('{', "");
-        projects = projects.replace('}', "");
-
-        // Load the section template
-        let env_name = "REPORT_TEMPLATE_PATH";
-        let fallback = "./report_template.md";
-        let mut rendered = utils::file_from_env(env_name, fallback);
-
-        // Replace the template variables with values
-        rendered = rendered.replace("{{sections}}", rendered_report.trim());
-        rendered = rendered.replace("{{weeknumber}}", &weeknumber);
-        rendered = rendered.replace("{{timespan}}", &timespan);
-        rendered = rendered.replace("{{projects}}", &projects);
-        rendered = rendered.replace("{{today}}", &today);
-        rendered = rendered.replace("{{author}}", &display_name);
-        rendered
-    };
+    let rendered = render_template(&render_sections, &config, editor).unwrap();
 
     RenderResult {
         rendered,
@@ -311,113 +269,6 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
         images,
         videos,
     }
-}
-
-fn render_section_md(render_section: &RenderSection, config: &Config) -> String {
-    // Load the section template
-    let env_name = "SECTION_TEMPLATE_PATH";
-    let fallback = "./section_template.md";
-    let mut rendered_section = utils::file_from_env(env_name, fallback);
-
-    // First iterate over news without project information
-    let mut rendered_news = String::new();
-    for news in &render_section.news {
-        rendered_news += &render_news_md(news, config);
-    }
-    rendered_news = rendered_news.trim().to_string();
-
-    // Then iterate over projects
-    let mut rendered_projects = String::new();
-    for render_project in &render_section.projects {
-        rendered_projects += &("\n\n".to_owned() + &render_project_md(render_project, config));
-    }
-    let rendered_projects = rendered_projects.trim().to_string();
-
-    // Replace the template variables with values
-    let section = &render_section.section;
-    rendered_section = rendered_section.replace("{{section.title}}", &section.title);
-    rendered_section = rendered_section.replace("{{section.emoji}}", &section.emoji);
-    rendered_section = rendered_section.replace("{{section.news}}", &rendered_news);
-    rendered_section = rendered_section.replace("{{section.projects}}", &rendered_projects);
-
-    rendered_section.trim().to_string()
-}
-
-fn render_project_md(render_project: &RenderProject, config: &Config) -> String {
-    // Load the project template
-    let env_name = "PROJECT_TEMPLATE_PATH";
-    let fallback = "./project_template.md";
-    let mut rendered_project = utils::file_from_env(env_name, fallback);
-
-    // Iterate over project news items
-    let mut rendered_news = String::new();
-    for news in &render_project.news {
-        rendered_news += &render_news_md(news, config);
-    }
-    rendered_news = rendered_news.trim().to_string();
-
-    // Replace the template variables with values
-    let project = &render_project.project;
-    rendered_project = rendered_project.replace("{{project.title}}", &project.title);
-    rendered_project = rendered_project.replace("{{project.emoji}}", &project.emoji);
-    rendered_project = rendered_project.replace("{{project.website}}", &project.website);
-    rendered_project = rendered_project.replace("{{project.description}}", &project.description);
-    rendered_project = rendered_project.replace("{{project.news}}", &rendered_news);
-
-    rendered_project.trim().to_string()
-}
-
-fn render_news_md(news: &News, config: &Config) -> String {
-    let user = format!(
-        "[{}](https://matrix.to/#/{})",
-        news.reporter_display_name, news.reporter_id
-    );
-
-    let verb = &config.random_verb();
-    let message = prepare_message(news.message());
-
-    let mut news_md = format!(
-        "{} {}\n\n\
-        {}\n",
-        user, verb, message
-    );
-
-    // Insert images/videos into markdown > quote, separating it from any elements before it
-    for (filename, _) in news.images() {
-        let image = config.image_markdown.replace("{{file}}", &filename);
-        news_md += &("\n>".to_owned() + &image.clone() + "\n");
-    }
-    for (filename, _) in news.videos() {
-        let video = config.video_markdown.replace("{{file}}", &filename);
-        news_md += &("\n>".to_owned() + &video.clone() + "\n");
-    }
-
-    news_md += "\n";
-    news_md
-}
-
-fn prepare_message(msg: String) -> String {
-    let msg = msg.trim();
-
-    // Turn matrix room aliases into matrix.to links
-    let matrix_rooms_re =
-        Regex::new("(^#([a-zA-Z0-9]|-|_)+:([a-zA-Z0-9]|-|_)+\\.([a-zA-Z0-9])+)").unwrap();
-    let msg = matrix_rooms_re.replace_all(msg, "[$1](https://matrix.to/#/$1)");
-    let matrix_rooms_re =
-        Regex::new(" (#([a-zA-Z0-9]|-|_)+:([a-zA-Z0-9]|-|_)+\\.([a-zA-Z0-9])+)").unwrap();
-    let msg = matrix_rooms_re.replace_all(&msg, " [$1](https://matrix.to/#/$1)");
-
-    // Turn <del> tags into markdown strikethrough
-    // NOTE: this does not work for nested tag, which shouldn't really happen in Matrix IM anyway
-    let strikethrough_re = Regex::new("<del>(.+?)</del>").unwrap();
-    let msg = strikethrough_re.replace_all(&msg, "~~$1~~");
-
-    // quote message
-    let msg = format!("> {}", msg);
-    let msg = msg.replace('\n', "\n> ");
-
-    // lists
-    msg.replace("> -", "> *")
 }
 
 fn message_link(config: &Config, event_id: &EventId) -> String {
