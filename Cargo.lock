@@ -1094,6 +1094,7 @@ version = "2.1.0"
 dependencies = [
  "async-process",
  "chrono",
+ "lazy_static",
  "log",
  "matrix-sdk",
  "mime",
