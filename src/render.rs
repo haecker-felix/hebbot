@@ -65,25 +65,6 @@ lazy_static::lazy_static! {
     };
 }
 
-fn render_template(
-    render_sections: &BTreeMap<String, RenderSection>,
-    config: &Config,
-    editor: &RoomMember,
-) -> Option<String> {
-    let template = JINJA_ENV.get_template("template").unwrap();
-
-    let result = template
-        .render(minijinja::context! {
-            sections => render_sections,
-            config => config,
-            editor => utils::get_member_display_name(editor),
-        })
-        .unwrap();
-
-    println!("{}", result);
-    Some(result)
-}
-
 pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> RenderResult {
     let mut render_projects: BTreeMap<String, RenderProject> = BTreeMap::new();
     let mut render_sections: BTreeMap<String, RenderSection> = BTreeMap::new();
@@ -260,7 +241,14 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     warnings.reverse();
     notes.reverse();
 
-    let rendered = render_template(&render_sections, &config, editor).unwrap();
+    let template = JINJA_ENV.get_template("template").unwrap();
+    let rendered = template
+        .render(minijinja::context! {
+            sections => render_sections,
+            config => config,
+            editor => utils::get_member_display_name(editor),
+        })
+        .unwrap();
 
     RenderResult {
         rendered,
