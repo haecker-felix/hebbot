@@ -65,7 +65,11 @@ lazy_static::lazy_static! {
     };
 }
 
-pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> RenderResult {
+pub fn render(
+    news_list: Vec<News>,
+    config: Config,
+    editor: &RoomMember,
+) -> Result<RenderResult, minijinja::Error> {
     let mut render_projects: BTreeMap<String, RenderProject> = BTreeMap::new();
     let mut render_sections: BTreeMap<String, RenderSection> = BTreeMap::new();
 
@@ -241,22 +245,22 @@ pub fn render(news_list: Vec<News>, config: Config, editor: &RoomMember) -> Rend
     warnings.reverse();
     notes.reverse();
 
-    let template = JINJA_ENV.get_template("template").unwrap();
-    let rendered = template
+    let rendered = JINJA_ENV
+        .get_template("template")?
         .render(minijinja::context! {
             sections => render_sections,
+            projects => project_names,
             config => config,
             editor => utils::get_member_display_name(editor),
-        })
-        .unwrap();
+        })?;
 
-    RenderResult {
+    Ok(RenderResult {
         rendered,
         warnings,
         notes,
         images,
         videos,
-    }
+    })
 }
 
 fn message_link(config: &Config, event_id: &EventId) -> String {
