@@ -26,7 +26,7 @@ In this closed room administrative commands can be executed.
 | !update-config  | Updates the bot configuration by executing `update_config_command` command |
 
 ### Configuration
-In order to use the bot, two configuration files are required. The `config.toml` configuration file contains the bot settings (username, room ids, etc) and the definitions for the sections and projects. The second configuration file `template.md` serves as a template for the actual summary.
+In order to use the bot, two configuration files are required. The `config.toml` configuration file contains the bot settings (username, room ids, etc) and the definitions for the sections and projects. The second configuration file `template.md` serves as a template for the actual summary, and its path may be set using the `TEMPLATE_PATH` environment variable.
 
 The password for the bot is supplied via the `BOT_PASSWORD` environment variable. Setting this will depend on how you start the bot. 
 

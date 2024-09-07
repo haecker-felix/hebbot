@@ -798,6 +798,15 @@ impl Bot {
 
             render::render(news, config, editor)
         };
+        let result = match result {
+            Ok(result) => result,
+            Err(error) => {
+                let msg = format!("❌ Could not render template: <pre>{}</pre>", error);
+                self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+                    .await;
+                return;
+            }
+        };
 
         // Upload rendered content as markdown file
         let bytes = result.rendered.into_bytes();
