@@ -3,6 +3,7 @@ use matrix_sdk::ruma::{EventId, OwnedMxcUri};
 use serde::{Deserialize, Serialize};
 
 use std::collections::{BTreeMap, HashSet};
+use std::sync::LazyLock;
 
 use crate::{utils, Config, News, Project, Section};
 
@@ -32,38 +33,61 @@ pub struct RenderResult {
     pub videos: Vec<(String, OwnedMxcUri)>,
 }
 
-fn random_filter(value: minijinja::Value) -> Result<minijinja::Value, minijinja::Error> {
-    if let Some(len) = value.len() {
-        value.get_item_by_index(rand::random::<usize>() % len)
-    } else {
-        Ok(value)
+fn template_filter_timedelta(
+    timestamp: minijinja::value::ViaDeserialize<time::OffsetDateTime>,
+    options: minijinja::value::Kwargs,
+) -> Result<minijinja::Value, minijinja::Error> {
+    let mut duration = time::Duration::seconds(0);
+    if let Some(seconds) = options.get::<Option<f64>>("seconds")? {
+        duration = duration.saturating_add(time::Duration::seconds_f64(seconds));
     }
+    if let Some(minutes) = options.get::<Option<i64>>("minutes")? {
+        duration = duration.saturating_add(time::Duration::minutes(minutes));
+    }
+    if let Some(hours) = options.get::<Option<i64>>("hours")? {
+        duration = duration.saturating_add(time::Duration::hours(hours));
+    }
+    if let Some(days) = options.get::<Option<i64>>("days")? {
+        duration = duration.saturating_add(time::Duration::days(days));
+    }
+    if let Some(weeks) = options.get::<Option<i64>>("weeks")? {
+        duration = duration.saturating_add(time::Duration::days(weeks * 7));
+    }
+    if let Some(months) = options.get::<Option<i64>>("months")? {
+        duration = duration.saturating_add(time::Duration::days(months * 30));
+    }
+    if let Some(years) = options.get::<Option<i64>>("years")? {
+        duration = duration.saturating_add(time::Duration::days(years * 365));
+    }
+    options.assert_all_used()?;
+
+    Ok(minijinja::Value::from_serialize(
+        timestamp.saturating_add(duration),
+    ))
 }
 
-lazy_static::lazy_static! {
-    static ref TEMPLATE_TEXT: String = {
-        use std::io::Read;
+static TEMPLATE_TEXT: LazyLock<String> = LazyLock::new(|| {
+    use std::io::Read;
 
-        let path = std::env::var("TEMPLATE_PATH").unwrap_or("template.md".into());
-        debug!("Reading template from file path: {:?}", path);
+    let path = std::env::var("TEMPLATE_PATH").unwrap_or("template.md".into());
+    debug!("Reading template from file path: {:?}", path);
 
-        let mut text = String::new();
-        std::fs::File::open(path)
-            .expect("Unable to open template file")
-            .read_to_string(&mut text)
-            .expect("Unable to read template file");
+    let mut text = String::new();
+    std::fs::File::open(path)
+        .expect("Unable to open template file")
+        .read_to_string(&mut text)
+        .expect("Unable to read template file");
 
-        text
-    };
+    text
+});
 
-    static ref JINJA_ENV: minijinja::Environment<'static> = {
-        let mut env = minijinja::Environment::new();
-        minijinja_contrib::add_to_environment(&mut env);
-        env.add_template("template", &TEMPLATE_TEXT).unwrap();
-        env.add_filter("random", random_filter);
-        env
-    };
-}
+static JINJA_ENV: LazyLock<minijinja::Environment> = LazyLock::new(|| {
+    let mut env = minijinja::Environment::new();
+    minijinja_contrib::add_to_environment(&mut env);
+    env.add_template("template", &TEMPLATE_TEXT).unwrap();
+    env.add_filter("timedelta", template_filter_timedelta);
+    env
+});
 
 pub fn render(
     news_list: Vec<News>,
@@ -248,7 +272,8 @@ pub fn render(
     let rendered = JINJA_ENV
         .get_template("template")?
         .render(minijinja::context! {
-            sections => render_sections,
+        timestamp => time::OffsetDateTime::now_utc(),
+        sections => render_sections,
             projects => project_names,
             config => config,
             editor => utils::get_member_display_name(editor),

@@ -1094,7 +1094,6 @@ version = "2.1.0"
 dependencies = [
  "async-process",
  "chrono",
- "lazy_static",
  "log",
  "matrix-sdk",
  "mime",
@@ -1105,6 +1104,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "time",
  "tokio",
  "toml",
  "url",
@@ -1802,6 +1802,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39ffd46ee854be23604a20efd6c9655374fefbe4d44b949dc0f907305d92873a"
 dependencies = [
  "minijinja",
+ "rand",
  "serde",
  "time",
 ]
