@@ -27,5 +27,6 @@ Check out documentation for...
 ### Example Usage
 - [This Week in GNOME](https://gitlab.gnome.org/World/twig) ([configuration](https://gitlab.gnome.org/World/twig/-/tree/main/hebbot))
 - [This Week in Matrix](https://matrix.org/blog/category/this-week-in-matrix) ([configuration](https://github.com/matrix-org/twim-config))
+- [The Bullhorn](https://forum.ansible.com/c/news/bullhorn/17) ([configuration](https://github.com/ansible-community/ansible.im/tree/main/bots))
 
 If you know any other project which uses Hebbot and you think it should be get listed here, please open a PR!
