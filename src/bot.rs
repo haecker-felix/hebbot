@@ -795,8 +795,22 @@ impl Bot {
             let news_store = self.news_store.lock().unwrap();
             let news = news_store.news();
             let config = self.config.clone();
-
             render::render(news, config, editor)
+        };
+        let result = match result {
+            Ok(result) => result,
+            Err(error) => {
+                let mut message = String::new();
+                write!(
+                    message,
+                    "❌ Could not render template: <pre>{}</pre>",
+                    error
+                )
+                .unwrap();
+                self.send_message(&message, BotMsgType::AdminRoomHtmlNotice)
+                    .await;
+                return;
+            }
         };
 
         // Upload rendered content as markdown file
