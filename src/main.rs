@@ -24,8 +24,6 @@ pub use section::Section;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    std::env::set_var("RUST_LOG", "debug");
-
     pretty_env_logger::init_timed();
 
     info!("Starting hebbot");
