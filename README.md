@@ -29,5 +29,6 @@ Check out documentation for...
 - [This Week in Matrix](https://matrix.org/blog/category/this-week-in-matrix) ([configuration](https://github.com/matrix-org/twim-config))
 - [The Bullhorn](https://forum.ansible.com/c/news/bullhorn/17) ([configuration](https://github.com/ansible-community/ansible.im/tree/main/bots))
 - [Bootc This Week](https://discussion.fedoraproject.org/tag/bootc-initiative) ([configuration](https://gitlab.com/fedora/bootc/bctw-config))
+- [WebKit Igalia Periodicals](https://blogs.igalia.com/webkit/categories/wip/)
 
 If you know any other project which uses Hebbot and you think it should be get listed here, please open a PR!
