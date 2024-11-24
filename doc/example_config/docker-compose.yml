@@ -7,9 +7,7 @@ services:
     environment:
       - BOT_PASSWORD=secretpassword
       - CONFIG_PATH=/data/config.toml
-      - REPORT_TEMPLATE_PATH=/data/report_template.md
-      - SECTION_TEMPLATE_PATH=/data/section_template.md
-      - PROJECT_TEMPLATE_PATH=/data/project_template.md
+      - TEMPLATE_PATH=/data/template.md
       - STORE_PATH=/data/store.json
 
 volumes:
