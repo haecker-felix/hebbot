@@ -893,7 +893,7 @@ impl Bot {
     async fn restart_command(&self) {
         self.send_message("Restarting hebbot…", BotMsgType::AdminRoomPlainNotice)
             .await;
-        Command::new("/proc/self/exe").exec();
+        let _ = Command::new("/proc/self/exe").exec();
     }
 
     async fn say_command(&self, msg: &str) {
