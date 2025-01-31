@@ -14,6 +14,10 @@ use matrix_sdk::ruma::events::AnyTimelineEvent;
 use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, ServerName, UserId};
 use matrix_sdk::{Client, Room, RoomState};
 
+use matrix_sdk::ruma::api::error::FromHttpResponseError;
+use matrix_sdk::HttpError::Api;
+use matrix_sdk::RumaApiError::ClientApi;
+
 use regex::Regex;
 
 use std::env;
@@ -128,12 +132,42 @@ impl Bot {
     /// Login
     async fn login(client: &Client, user: &str, pwd: &str) {
         info!("Logging in…");
-        let response = client
-            .matrix_auth()
-            .login_username(user, pwd)
-            .initial_device_display_name("hebbot")
-            .await
-            .expect("Unable to login");
+        let response = loop {
+            let response = client
+                .matrix_auth()
+                .login_username(user, pwd)
+                .initial_device_display_name("hebbot")
+                .await;
+            match response {
+                Ok(r) => break r,
+                Err(matrix_sdk::Error::Http(Api(FromHttpResponseError::Server(ClientApi(e)))))
+                    if e.status_code == 429 =>
+                {
+                    if let matrix_sdk::ruma::api::client::error::ErrorBody::Standard {
+                        kind:
+                            matrix_sdk::ruma::api::client::error::ErrorKind::LimitExceeded {
+                                retry_after_ms,
+                            },
+                        ..
+                    } = e.body
+                    {
+                        if let Some(retry_after_ms) = retry_after_ms {
+                            let sleep_duration =
+                                retry_after_ms + tokio::time::Duration::from_millis(250);
+                            debug!("Sleeping for {sleep_duration:?} before retrying login…");
+                            tokio::time::sleep(sleep_duration).await;
+                        } else {
+                            debug!("No wait time given, retrying right away");
+                        }
+                        continue;
+                    }
+                    panic!("Error: {e:?}");
+                }
+                Err(e) => {
+                    panic!("Error: {e:?}");
+                }
+            }
+        };
 
         info!("Doing the initial sync…");
         client
