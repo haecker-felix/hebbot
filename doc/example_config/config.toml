@@ -4,8 +4,6 @@ reporting_room_id = '!roomid:domain.org'
 admin_room_id = '!adminroomid:domain.org'
 notice_emoji = '⭕'
 restrict_notice = true
-image_markdown = '> ![]({{file}})'
-video_markdown = '> {{< video src="{{file}}" >}}'
 verbs = ["reports", "says", "announces"]
 min_length = 30
 # Set to '' to disable text response
