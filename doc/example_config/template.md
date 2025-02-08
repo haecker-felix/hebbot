@@ -52,13 +52,13 @@ draft: false
 
 > {{ item.message | replace("\n", "\n> ") }}
     {%- if item.images -%}
-      {%- for imgId, image in item.images | dictsort %}
+      {%- for image in item.images %}
 > ![]({{ image[0] }})
       {%- endfor %}
     {%- endif -%} {#- news item images #}
 
     {%- if item.videos -%}
-      {%- for vidId, video in item.videos | dictsort %}
+      {%- for video in item.videos %}
 > {{ "{{" }}<video src="{{ video[0] }}">{{ "}}" }}
       {%- endfor %}
     {%- endif -%} {#- news item videos #}

@@ -1,5 +1,6 @@
+use chrono::{DateTime, Utc};
 use matrix_sdk::room::RoomMember;
-use matrix_sdk::ruma::{EventId, OwnedMxcUri};
+use matrix_sdk::ruma::{EventId, OwnedMxcUri, OwnedUserId};
 use serde::{Deserialize, Serialize};
 
 use std::collections::{BTreeMap, HashSet};
@@ -7,10 +8,33 @@ use std::sync::LazyLock;
 
 use crate::{utils, Config, News, Project, Section};
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct RenderNews {
+    pub reporter_id: OwnedUserId,
+    pub reporter_display_name: String,
+    pub timestamp: DateTime<Utc>,
+    pub message: String,
+    pub images: Vec<(String, OwnedMxcUri)>,
+    pub videos: Vec<(String, OwnedMxcUri)>,
+}
+
+impl From<News> for RenderNews {
+    fn from(news: News) -> Self {
+        RenderNews {
+            reporter_id: news.reporter_id.clone(),
+            reporter_display_name: news.reporter_display_name.clone(),
+            timestamp: news.timestamp,
+            message: news.message(),
+            images: news.images(),
+            videos: news.videos(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct RenderProject {
     pub project: Project,
-    pub news: Vec<News>,
+    pub news: Vec<RenderNews>,
 
     // For news with overwritten section information (-> doesn't match project default_section)
     pub overwritten_section: Option<String>,
@@ -22,7 +46,7 @@ struct RenderSection {
     pub projects: Vec<RenderProject>,
 
     // For news without project information
-    pub news: Vec<News>,
+    pub news: Vec<RenderNews>,
 }
 
 pub struct RenderResult {
@@ -132,8 +156,8 @@ pub fn render(
         news_count += 1;
 
         // Get news images / videos
-        images.append(&mut news.images().clone());
-        videos.append(&mut news.videos().clone());
+        images.append(&mut news.images());
+        videos.append(&mut news.videos());
 
         // Add news entries without any project information (but with section information) directly to the specified `RenderSection`
         if news.project_names().is_empty() {
@@ -146,14 +170,14 @@ pub fn render(
                 match render_sections.get_mut(&map_section_name) {
                     // RenderSection already exists -> Add news entry to it
                     Some(render_section) => {
-                        render_section.news.insert(0, news.clone());
+                        render_section.news.insert(0, news.clone().into());
                     }
                     // RenderSection doesn't exist yet -> Create it, and add news entry to it
                     None => {
                         let render_section = RenderSection {
                             section,
                             projects: Vec::new(),
-                            news: vec![news.clone()],
+                            news: vec![news.clone().into()],
                         };
                         render_sections.insert(map_section_name, render_section);
                     }
@@ -178,12 +202,12 @@ pub fn render(
 
                     match render_projects.get_mut(&custom_project_section_name) {
                         // RenderProject already exists -> Add news entry to it
-                        Some(render_project) => render_project.news.insert(0, news.clone()),
+                        Some(render_project) => render_project.news.insert(0, news.clone().into()),
                         // RenderProject doesn't exist yet -> Create it, and add news entry to it
                         None => {
                             let render_project = RenderProject {
                                 project: project.clone(),
-                                news: vec![news.clone()],
+                                news: vec![news.clone().into()],
                                 overwritten_section: Some(section_name),
                             };
                             render_projects
@@ -200,12 +224,12 @@ pub fn render(
             // Standard (news entry doesn't use a custom section)
             match render_projects.get_mut(&news_project_name) {
                 // RenderProject already exists -> Add news entry to it
-                Some(render_project) => render_project.news.insert(0, news.clone()),
+                Some(render_project) => render_project.news.insert(0, news.clone().into()),
                 // RenderProject doesn't exist yet -> Create it, and add news entry to it
                 None => {
                     let render_project = RenderProject {
                         project,
-                        news: vec![news.clone()],
+                        news: vec![news.clone().into()],
                         overwritten_section: None,
                     };
                     render_projects.insert(news_project_name, render_project);
@@ -272,8 +296,8 @@ pub fn render(
     let rendered = JINJA_ENV
         .get_template("template")?
         .render(minijinja::context! {
-        timestamp => time::OffsetDateTime::now_utc(),
-        sections => render_sections,
+            timestamp => time::OffsetDateTime::now_utc(),
+            sections => render_sections,
             projects => project_names,
             config => config,
             editor => utils::get_member_display_name(editor),
