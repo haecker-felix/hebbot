@@ -339,7 +339,7 @@ impl Bot {
                 news.set_message(updated_message);
                 if news.is_assigned() {
                     Some(format!(
-                        "✅ The news entry by {} got edited ({}). Check the new text, and make sure you want to keep the assigned project/section.",
+                        "✅ The news entry by {} got edited. Check the new text, and make sure you want to keep the assigned project/section. [{}]",
                         news.reporter_id,
                         link
                     ))
@@ -430,7 +430,7 @@ impl Bot {
                             None
                         } else {
                             Some(format!(
-                                "❌ Unable to add {}’s message as news, invalid event/message type [{}]",
+                                "❌ Unable to add {}’s message as news, invalid event/message type. [{}]",
                                 related_event.sender(),
                                 link,
                             ))
@@ -471,7 +471,7 @@ impl Bot {
                         }
                     } else {
                         Some(format!(
-                            "❌ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
+                            "⚠️ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
                             reaction_sender.user_id(),
                             reaction_type,
                             link,
@@ -615,14 +615,14 @@ impl Bot {
                 let reaction_type = news.remove_reaction_id(redacted_event_id);
                 if reaction_type == ReactionType::Notice {
                     Some(format!(
-                        "✅ {} removed their image/video notice reaction from {}’s news entry ({}).",
+                        "✅ {} removed their image/video notice reaction from {}’s news entry. [{}]",
                         member.user_id(),
                         news.reporter_id,
                         link
                     ))
                 } else if reaction_type != ReactionType::None {
                     Some(format!(
-                        "✅ {} removed their {} reaction from {}’s news entry ({}).",
+                        "✅ {} removed their {} reaction from {}’s news entry. [{}]",
                         member.user_id(),
                         reaction_type,
                         news.reporter_id,
@@ -630,7 +630,7 @@ impl Bot {
                     ))
                 } else {
                     debug!(
-                        "Ignoring redaction, doesn’t match any known emoji reaction event id (ID {:?})",
+                        "❌️ Ignoring redaction, doesn’t match any known emoji reaction event id (ID {:?})",
                         redacted_event_id
                     );
                     None
