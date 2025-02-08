@@ -449,7 +449,7 @@ impl Bot {
                                 let section = section.unwrap();
                                 news.add_section_name(reaction_event_id.to_owned(), section.name);
                                 Some(format!(
-                                    "✅ Editor {} added {}’s news entry [{}] to the “{}” section.",
+                                    "✅ {} added {}’s news entry [{}] to the “{}” section.",
                                     reaction_sender.user_id(),
                                     news.reporter_id,
                                     link,
@@ -460,7 +460,7 @@ impl Bot {
                                 let project = project.unwrap();
                                 news.add_project_name(reaction_event_id.to_owned(), project.name);
                                 Some(format!(
-                                    "✅ Editor {} added the project description “{}” to {}’s news entry [{}].",
+                                    "✅ {} added the project description “{}” to {}’s news entry [{}].",
                                     reaction_sender.user_id(),
                                     project.title,
                                     news.reporter_id,
@@ -598,16 +598,31 @@ impl Bot {
             // Redaction / deletion of the news entry itself
             let msg = if let Ok(news) = news_store.remove_news(redacted_event_id) {
                 Some(format!(
-                    "✅ {}’s news entry got deleted by {}",
+                    "✅ {}’s news entry got deleted by {}.",
                     news.reporter_id,
                     member.user_id()
+                ))
+            // An image / video got redacted / deleted
+            } else if let Some(news) = news_store.news_by_file_id(redacted_event_id) {
+                news.remove_file(&redacted_event_id.to_owned());
+                Some(format!(
+                    "✅ {} deleted an image/video of {}’s news entry.",
+                    member.user_id(),
+                    news.reporter_id,
                 ))
             // Redaction of reaction events (project / section)
             } else if let Some(news) = news_store.news_by_reaction_id(redacted_event_id) {
                 let reaction_type = news.remove_reaction_id(redacted_event_id);
-                if reaction_type != ReactionType::None {
+                if reaction_type == ReactionType::Notice {
                     Some(format!(
-                        "✅ Editor {} removed {} from {}’s news entry ({}).",
+                        "✅ {} removed their image/video notice reaction from {}’s news entry ({}).",
+                        member.user_id(),
+                        news.reporter_id,
+                        link
+                    ))
+                } else if reaction_type != ReactionType::None {
+                    Some(format!(
+                        "✅ {} removed their {} reaction from {}’s news entry ({}).",
                         member.user_id(),
                         reaction_type,
                         news.reporter_id,
@@ -719,7 +734,7 @@ impl Bot {
             let news = news_store.news();
             news_store.clear_news();
 
-            format!("Cleared {} news entries!", news.len())
+            format!("✅ Cleared {} news entries!", news.len())
         };
 
         self.send_message(&msg, BotMsgType::AdminRoomPlainNotice)

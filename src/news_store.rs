@@ -52,14 +52,23 @@ impl NewsStore {
         self.news_map.values().cloned().collect()
     }
 
+    /// Get news by using the event id of the news message itself
     pub fn news_by_message_id(&self, message_event_id: &EventId) -> Option<&News> {
         self.news_map.get(message_event_id)
     }
 
+    /// Get news by using reaction event id
     pub fn news_by_reaction_id(&self, reaction_event_id: &EventId) -> Option<&News> {
         self.news_map
             .values()
             .find(|&n| n.relates_to_reaction_id(reaction_event_id))
+    }
+
+    /// Get news by using image or video file event id
+    pub fn news_by_file_id(&self, file_id: &EventId) -> Option<&News> {
+        self.news_map
+            .values()
+            .find(|&news| news.relates_to_file_id(file_id))
     }
 
     pub fn find_related_news(&self, reporter_id: &str, timestamp: &DateTime<Utc>) -> Option<&News> {

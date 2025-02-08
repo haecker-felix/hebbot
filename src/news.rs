@@ -127,12 +127,29 @@ impl News {
     /// Remove a image or video file from this news
     pub fn remove_file(
         &self,
-        event_id: &OwnedEventId,
+        file_event_id: &OwnedEventId,
     ) -> Option<(OwnedEventId, String, OwnedMxcUri)> {
-        let img = self.images.borrow_mut().remove(event_id);
-        let vid = self.videos.borrow_mut().remove(event_id);
+        let mut removed: Option<(OwnedEventId, String, OwnedMxcUri)> = None;
 
-        img.or(vid)
+        self.images.borrow_mut().retain(|_k, v| {
+            if v.0 != *file_event_id {
+                removed = Some((v.0.clone(), v.1.clone(), v.2.clone()));
+                true
+            } else {
+                false
+            }
+        });
+
+        self.videos.borrow_mut().retain(|_k, v| {
+            if v.0 != *file_event_id {
+                removed = Some((v.0.clone(), v.1.clone(), v.2.clone()));
+                true
+            } else {
+                false
+            }
+        });
+
+        removed
     }
 
     /// Deduplicates files based on the mxc uri.
@@ -158,6 +175,10 @@ impl News {
             ReactionType::Section(None)
         } else if self.project_names.borrow_mut().remove(event_id).is_some() {
             ReactionType::Project(None)
+        } else if self.images.borrow_mut().remove(event_id).is_some()
+            || self.videos.borrow_mut().remove(event_id).is_some()
+        {
+            ReactionType::Notice
         } else {
             ReactionType::None
         }
@@ -183,6 +204,19 @@ impl News {
             if i == reaction_id {
                 return true;
             }
+        }
+
+        false
+    }
+
+    /// Check if a image/video belongs to this news using the file message id
+    pub fn relates_to_file_id(&self, file_id: &EventId) -> bool {
+        if self.images.borrow().values().any(|v| v.0 == file_id) {
+            return true;
+        }
+
+        if self.videos.borrow().values().any(|v| v.0 == file_id) {
+            return true;
         }
 
         false
