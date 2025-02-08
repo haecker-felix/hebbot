@@ -499,6 +499,7 @@ impl Bot {
                             if let MediaSource::Plain(mxc_uri) = &image.source {
                                 news.add_image(
                                     reaction_event_id.to_owned(),
+                                    related_event_id.into(),
                                     image.body.clone(),
                                     mxc_uri.clone(),
                                 );
@@ -538,6 +539,7 @@ impl Bot {
                             if let MediaSource::Plain(mxc_uri) = &video.source {
                                 news.add_video(
                                     reaction_event_id.to_owned(),
+                                    related_event_id.into(),
                                     video.body.clone(),
                                     mxc_uri.clone(),
                                 );
@@ -590,7 +592,6 @@ impl Bot {
     /// - Or a message itself got deleted / redacted
     async fn on_reporting_room_redaction(&self, member: &RoomMember, redacted_event_id: &EventId) {
         let message = {
-            let is_editor = self.is_editor(member).await;
             let mut news_store = self.news_store.lock().unwrap();
             let link = self.message_link(redacted_event_id);
 
@@ -601,9 +602,6 @@ impl Bot {
                     news.reporter_id,
                     member.user_id()
                 ))
-            // For all other redactions, there is no point in checking them if the member is not an editor.
-            } else if !is_editor {
-                None
             // Redaction of reaction events (project / section)
             } else if let Some(news) = news_store.news_by_reaction_id(redacted_event_id) {
                 let reaction_type = news.remove_reaction_id(redacted_event_id);

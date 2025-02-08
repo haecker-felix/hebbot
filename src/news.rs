@@ -17,8 +17,9 @@ pub struct News {
     message: RefCell<String>,
     section_names: RefCell<HashMap<OwnedEventId, String>>,
     project_names: RefCell<HashMap<OwnedEventId, String>>,
-    images: RefCell<HashMap<OwnedEventId, (String, OwnedMxcUri)>>,
-    videos: RefCell<HashMap<OwnedEventId, (String, OwnedMxcUri)>>,
+    // <Reaction event id, (file event id, filename, mxc uri)>
+    images: RefCell<HashMap<OwnedEventId, (OwnedEventId, String, OwnedMxcUri)>>,
+    videos: RefCell<HashMap<OwnedEventId, (OwnedEventId, String, OwnedMxcUri)>>,
 }
 
 impl News {
@@ -92,47 +93,64 @@ impl News {
     }
 
     pub fn images(&self) -> Vec<(String, OwnedMxcUri)> {
-        Self::files(&self.images.borrow())
+        Self::deduplicate_files(&self.images.borrow())
     }
 
-    pub fn add_image(&self, event_id: OwnedEventId, filename: String, mxc_uri: OwnedMxcUri) {
+    pub fn add_image(
+        &self,
+        reaction_event_id: OwnedEventId,
+        image_event_id: OwnedEventId,
+        filename: String,
+        mxc_uri: OwnedMxcUri,
+    ) {
         self.images
             .borrow_mut()
-            .insert(event_id, (filename, mxc_uri));
+            .insert(reaction_event_id, (image_event_id, filename, mxc_uri));
     }
 
     pub fn videos(&self) -> Vec<(String, OwnedMxcUri)> {
-        Self::files(&self.videos.borrow())
+        Self::deduplicate_files(&self.videos.borrow())
     }
 
-    pub fn add_video(&self, event_id: OwnedEventId, filename: String, mxc_uri: OwnedMxcUri) {
+    pub fn add_video(
+        &self,
+        reaction_event_id: OwnedEventId,
+        video_event_id: OwnedEventId,
+        filename: String,
+        mxc_uri: OwnedMxcUri,
+    ) {
         self.videos
             .borrow_mut()
-            .insert(event_id, (filename, mxc_uri));
+            .insert(reaction_event_id, (video_event_id, filename, mxc_uri));
     }
 
-    fn files(files: &HashMap<OwnedEventId, (String, OwnedMxcUri)>) -> Vec<(String, OwnedMxcUri)> {
-        let mut images_map = HashMap::new();
-        let mut images = Vec::new();
+    /// Remove a image or video file from this news
+    pub fn remove_file(
+        &self,
+        event_id: &OwnedEventId,
+    ) -> Option<(OwnedEventId, String, OwnedMxcUri)> {
+        let img = self.images.borrow_mut().remove(event_id);
+        let vid = self.videos.borrow_mut().remove(event_id);
 
-        // First we add everything to a HashMap to filter out duplicates
-        // eg. having two editors who tagged the same image with the camera emoji
-        for (name, uri) in files.values() {
-            let path = std::path::Path::new(name);
-            let suffix = path
-                .extension()
-                .map(|osstr| osstr.to_str().unwrap())
-                .unwrap_or_else(|| "");
-            let filename = format!("{}.{}", uri.media_id().unwrap_or("no-media-id"), suffix);
+        img.or(vid)
+    }
 
-            images_map.insert(filename, uri.clone());
+    /// Deduplicates files based on the mxc uri.
+    /// Can happen when multiple editors reacted to the same file
+    /// -> File is listed for every single reaction
+    fn deduplicate_files(
+        files: &HashMap<OwnedEventId, (OwnedEventId, String, OwnedMxcUri)>,
+    ) -> Vec<(String, OwnedMxcUri)> {
+        let mut deduplicated = HashMap::new();
+
+        for (_event_id, filename, mxc_uri) in files.values() {
+            // The filenames aren't guaranteed to be unique ("image.png"), so prefix them with the media id
+            let unique_name = format!("{}_{}", mxc_uri.media_id().unwrap_or_default(), filename);
+
+            deduplicated.insert(mxc_uri.clone(), (unique_name, mxc_uri.clone()));
         }
 
-        for (filename, uri) in images_map {
-            images.insert(0, (filename, uri));
-        }
-
-        images
+        deduplicated.values().cloned().collect()
     }
 
     pub fn remove_reaction_id(&self, event_id: &EventId) -> ReactionType {
