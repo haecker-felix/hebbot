@@ -18,8 +18,10 @@ use regex::Regex;
 
 use std::env;
 use std::fmt::Write;
+use std::io::Write as WriteExt;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
+use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 
 use crate::{render, utils, BotMessageType as BotMsgType, Config, News, NewsStore, ReactionType};
@@ -693,6 +695,7 @@ impl Bot {
             "!say" => self.say_command(args).await,
             "!status" => self.status_command().await,
             "!update-config" => self.update_config_command().await,
+            "!publish" => self.publish_command(member).await,
             _ => self.unrecognized_command().await,
         }
     }
@@ -705,6 +708,7 @@ impl Bot {
             !list-config \n\
             !list-projects \n\
             !list-sections \n\
+            !publish \n\
             !render \n\
             !restart \n\
             !say <message> \n\
@@ -833,6 +837,119 @@ impl Bot {
         // Send file
         self.send_file(response.content_uri, "rendered.md".to_string(), true)
             .await;
+
+        // Send warnings
+        let warnings = utils::format_messages(true, &result.warnings);
+        if !result.warnings.is_empty() {
+            self.send_message(&warnings, BotMsgType::AdminRoomHtmlNotice)
+                .await;
+        }
+
+        // Send notes
+        let notes = utils::format_messages(false, &result.notes);
+        if !result.notes.is_empty() {
+            self.send_message(&notes, BotMsgType::AdminRoomHtmlNotice)
+                .await;
+        }
+
+        // Generate a curl command which can get used to download all files (images/videos).
+        let mut files = result.images.clone();
+        files.append(&mut result.videos.clone());
+        if !files.is_empty() {
+            self.send_message(
+                "Use this command to download all files:",
+                BotMsgType::AdminRoomHtmlNotice,
+            )
+            .await;
+
+            let mut curl_command = "curl".to_string();
+            for (filename, uri) in &files {
+                if uri.is_valid() {
+                    let url = format!(
+                        "{}_matrix/media/r0/download/{}/{}",
+                        self.client.homeserver(),
+                        uri.server_name().unwrap(),
+                        uri.media_id().unwrap()
+                    );
+
+                    write!(curl_command, " {} -o {}", url, filename).unwrap();
+                }
+            }
+
+            let msg = format!("<pre><code>{}</code></pre>\n", curl_command);
+            self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+                .await;
+        }
+    }
+
+    async fn publish_command(&self, editor: &RoomMember) {
+        let result = {
+            let news_store = self.news_store.lock().unwrap();
+            let news = news_store.news();
+            let config = self.config.clone();
+
+            render::render(news, config, editor)
+        };
+        let result = match result {
+            Ok(result) => result,
+            Err(error) => {
+                let msg = format!("❌ Could not render template: <pre>{}</pre>", error);
+                self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+                    .await;
+                return;
+            }
+        };
+        // Upload rendered content as markdown file
+        let bytes = result.rendered.into_bytes();
+
+        let publish_command = self.config.publish_command.clone();
+        if let Some(command) = publish_command {
+            let mut child = Command::new(command)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn()
+                .expect("Can't spawn child process.");
+
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin.write_all(&bytes).expect("Couldn't write bytes.");
+                let _ = stdin.flush();
+            }
+
+            let output = child
+                .wait_with_output()
+                .expect("Can't wait on the child command.");
+
+            if output.status.success() {
+                let stdout =
+                    String::from_utf8(output.stdout.clone()).expect("Program output was not valid utf-8");
+                self.send_message(&"publish_command was successful", BotMsgType::AdminRoomHtmlNotice)
+                    .await;
+                self.send_message(&stdout, BotMsgType::AdminRoomHtmlNotice)
+                    .await;
+            } else {
+                if let Some(code) = output.status.code() {
+                    self.send_message(
+                        &format!("ErrorCode: {}", code),
+                        BotMsgType::AdminRoomHtmlNotice,
+                    )
+                    .await;
+                }
+                let stderr =
+                    String::from_utf8(output.stderr.clone()).expect("Program output was not valid utf-8");
+                self.send_message(&stderr, BotMsgType::AdminRoomHtmlNotice)
+                    .await;
+            }
+        } else {
+            let message = utils::format_messages(
+                true,
+                &vec![
+                    "No publish_command configured.".into(),
+                    "Will not perform any action.".into(),
+                ],
+            );
+            self.send_message(&message, BotMsgType::AdminRoomHtmlNotice)
+                .await;
+        }
 
         // Send warnings
         let warnings = utils::format_messages(true, &result.warnings);
