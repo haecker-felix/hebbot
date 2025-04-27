@@ -1,6 +1,6 @@
 # Build stage
 
-FROM rust:buster as cargo-build
+FROM rust:bookworm as cargo-build
 RUN apt-get update && apt-get -y install libolm-dev cmake
 
 WORKDIR /usr/src/hebbot
