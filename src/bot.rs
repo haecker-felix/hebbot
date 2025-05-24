@@ -176,9 +176,7 @@ impl Bot {
         if let Err(err) = self.reporting_room.send(content).await {
             warn!(
                 "Could not send {} reaction to msg {}: {}",
-                reaction,
-                msg_event_id,
-                err.to_string()
+                reaction, msg_event_id, err
             );
         }
     }
@@ -826,7 +824,7 @@ impl Bot {
         let response = self
             .client
             .media()
-            .upload(&mime::TEXT_PLAIN_UTF_8, bytes)
+            .upload(&mime::TEXT_PLAIN_UTF_8, bytes, None)
             .await
             .expect("Can't upload rendered file.");
 
