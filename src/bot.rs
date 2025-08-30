@@ -10,7 +10,7 @@ use matrix_sdk::ruma::events::room::message::{
 };
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::events::room::MediaSource;
-use matrix_sdk::ruma::events::AnyTimelineEvent;
+use matrix_sdk::ruma::events::{AnyTimelineEvent, Mentions};
 use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, ServerName, UserId};
 use matrix_sdk::{Client, Room, RoomState};
 
@@ -211,7 +211,13 @@ impl Bot {
 
             // Reporting room
             if room.room_id() == bot.reporting_room.room_id() {
-                bot.on_reporting_room_msg(text.clone(), &member, id).await;
+                bot.on_reporting_room_msg(
+                    text.clone(),
+                    event.content.mentions.as_ref(),
+                    &member,
+                    id,
+                )
+                .await;
             }
 
             // Admin room
@@ -290,18 +296,23 @@ impl Bot {
     }
 
     /// New message in reporting room
-    /// - When the bot gets mentioned at the beginning of the message,
-    ///   the message will get stored as News in NewsStore
+    /// - When the bot gets mentioned with `m.mentions` or by name
+    ///   at the beginning of the message, the message will get
+    ///   stored as News in NewsStore
     async fn on_reporting_room_msg(
         &self,
         message: String,
+        mentions: Option<&Mentions>,
         member: &RoomMember,
         event_id: &EventId,
     ) {
-        // We're going to ignore all messages, expect it mentions the bot at the beginning
+        // We're going to ignore all messages, except if the mentions contain the ID of the bot,
+        // or if the message mentions the bot by name at the beginning
         let bot_id = self.client.user_id().unwrap();
         let bot_display_name = self.client.account().get_display_name().await.unwrap();
-        if !utils::msg_starts_with_mention(bot_id, bot_display_name, message.clone()) {
+        if mentions.is_none_or(|mentions| !mentions.user_ids.contains(bot_id))
+            && !utils::msg_starts_with_mention(bot_id, bot_display_name, message.clone())
+        {
             return;
         }
 

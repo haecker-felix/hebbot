@@ -4,12 +4,12 @@
 [![](https://img.shields.io/badge/matrix-%23hebbot%3Ahaecker.io-lightgrey)](https://matrix.to/#/#hebbot:haecker.io)
 [![]( https://img.shields.io/github/actions/workflow/status/haecker-felix/hebbot/build.yml)](https://github.com/haecker-felix/hebbot/actions)
 
-A [Matrix](matrix.org) bot which can help to generate periodic / recurrent summary blog posts (also known as "This Week in X"). 
+A [Matrix](matrix.org) bot which can help to generate periodic / recurrent summary blog posts (also known as "This Week in X").
 
 The bot was inspired by [twim-o-matic](https://github.com/matrix-org/twim-o-matic/tree/master/data), and is developed in Rust using the [matrix-rust-sdk](https://github.com/matrix-org/matrix-rust-sdk). You can find us at [#hebbot:haecker.io](https://matrix.to/#/#hebbot:haecker.io).
 
 ### Features
-- Automatic recognition of news when the bot username is mentioned at the beginning of the message
+- Automatic recognition of news when the bot is [mentioned](https://spec.matrix.org/v1.15/client-server-api/#user-and-room-mentions) or its username appears at the beginning of the message
 - Approval of messages by a defined group of editors
 - Messages can be sorted into projects / sections by using emoji reactions
 - Support for images / videos
