@@ -225,7 +225,7 @@ impl News {
 
 impl PartialOrd for News {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.timestamp.cmp(&other.timestamp))
+        Some(self.cmp(other))
     }
 }
 
