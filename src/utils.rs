@@ -1,9 +1,9 @@
 use async_process::{Command, Stdio};
 use matrix_sdk::deserialized_responses::TimelineEventKind;
-use matrix_sdk::room::{Room, RoomMember};
+use matrix_sdk::room::Room;
 use matrix_sdk::ruma::events::room::message::{
     MessageType, NoticeMessageEventContent, OriginalSyncRoomMessageEvent, Relation,
-    RoomMessageEventContent, TextMessageEventContent,
+    TextMessageEventContent,
 };
 use matrix_sdk::ruma::events::{
     AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
@@ -15,41 +15,6 @@ use std::fmt::Write;
 use std::fs::File;
 use std::io::Read;
 use std::{env, str};
-
-use crate::News;
-
-/// Try to convert a `AnySyncTimelineEvent` into a `News`
-pub fn create_news_by_event(
-    any_room_event: &AnySyncTimelineEvent,
-    member: &RoomMember,
-) -> Option<News> {
-    // Fetch related event's
-    // * event_id
-    // * reporter_id
-    // * reporter_display_name
-    // * message
-    if let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(
-        SyncMessageLikeEvent::Original(OriginalSyncRoomMessageEvent {
-            content:
-                RoomMessageEventContent {
-                    msgtype:
-                        MessageType::Text(TextMessageEventContent { body, .. })
-                        | MessageType::Notice(NoticeMessageEventContent { body, .. }),
-                    ..
-                },
-            ..
-        }),
-    )) = any_room_event
-    {
-        let message = body.clone();
-
-        let news = News::new(any_room_event.event_id().to_owned(), member, message);
-
-        Some(news)
-    } else {
-        None
-    }
-}
 
 /// Get room message by event id
 pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnySyncTimelineEvent> {
@@ -66,24 +31,31 @@ pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnySync
     }
 }
 
-pub async fn message_type(room_event: &AnySyncTimelineEvent) -> Option<MessageType> {
+/// Get the given event as a message event, if it is one.
+pub fn as_message_event(
+    room_event: &AnySyncTimelineEvent,
+) -> Option<&OriginalSyncRoomMessageEvent> {
     if let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(
         SyncMessageLikeEvent::Original(ev),
     )) = room_event
     {
-        Some(ev.content.msgtype.clone())
+        Some(ev)
     } else {
         None
     }
 }
 
 /// A simplified way of getting the text from a message event
-pub fn get_message_event_text(event: &OriginalSyncRoomMessageEvent) -> Option<String> {
-    if let MessageType::Text(TextMessageEventContent { body, .. }) = &event.content.msgtype {
-        Some(body.to_owned())
-    } else {
-        None
+pub fn get_message_event_text(
+    event: &OriginalSyncRoomMessageEvent,
+    allow_notice: bool,
+) -> Option<String> {
+    match &event.content.msgtype {
+        MessageType::Text(TextMessageEventContent { body, .. }) => Some(body),
+        MessageType::Notice(NoticeMessageEventContent { body, .. }) if allow_notice => Some(body),
+        _ => None,
     }
+    .cloned()
 }
 
 /// A simplified way of getting an edited message

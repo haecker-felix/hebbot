@@ -10,7 +10,7 @@ use matrix_sdk::ruma::events::room::message::{
 };
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::events::room::MediaSource;
-use matrix_sdk::ruma::events::{AnySyncTimelineEvent, Mentions};
+use matrix_sdk::ruma::events::Mentions;
 use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, ServerName, UserId};
 use matrix_sdk::{Client, Room, RoomState};
 
@@ -205,7 +205,7 @@ impl Bot {
         }
 
         // Standard text message
-        if let Some(text) = utils::get_message_event_text(&event) {
+        if let Some(text) = utils::get_message_event_text(&event, false) {
             let member = room.get_member(&event.sender).await.unwrap().unwrap();
             let id = &event.event_id;
 
@@ -249,7 +249,7 @@ impl Bot {
         let emoji = &relation.key.replace('\u{fe0f}', "");
 
         if let Some(related_event) = utils::room_event_by_id(&room, &related_event_id).await {
-            if let Some(related_msg_type) = utils::message_type(&related_event).await {
+            if let Some(related_event) = utils::as_message_event(&related_event) {
                 // Reporting room
                 if room.room_id() == bot.reporting_room.room_id() {
                     bot.on_reporting_room_reaction(
@@ -257,8 +257,7 @@ impl Bot {
                         &reaction_sender,
                         emoji,
                         &reaction_event_id,
-                        &related_event,
-                        &related_msg_type,
+                        related_event,
                     )
                     .await;
                 }
@@ -370,8 +369,7 @@ impl Bot {
         reaction_sender: &RoomMember,
         reaction_emoji: &str,
         reaction_event_id: &EventId,
-        related_event: &AnySyncTimelineEvent,
-        related_message_type: &MessageType,
+        related_event: &OriginalSyncRoomMessageEvent,
     ) {
         let reaction_emoji = reaction_emoji.strip_suffix(" ?").unwrap_or(reaction_emoji);
 
@@ -389,9 +387,9 @@ impl Bot {
 
         let message: Option<String> = {
             let reaction_type = self.config.reaction_type_by_emoji(reaction_emoji);
-            let related_event_id = related_event.event_id();
+            let related_event_id = &related_event.event_id;
             let related_event_timestamp: DateTime<Utc> = related_event
-                .origin_server_ts()
+                .origin_server_ts
                 .to_system_time()
                 .unwrap()
                 .into();
@@ -405,14 +403,14 @@ impl Bot {
                 return;
             }
 
-            let msg = match related_message_type {
+            let msg = match &related_event.content.msgtype {
                 MessageType::Text(_) | MessageType::Notice(_) => {
                     // Check if the reaction == notice emoji,
                     // Yes -> Try to add the message as news submission
                     let msg = if utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji) {
                         // we need related_event's sender
                         let related_event_sender = room
-                            .get_member(related_event.sender())
+                            .get_member(&related_event.sender)
                             .await
                             .unwrap()
                             .unwrap();
@@ -424,15 +422,15 @@ impl Bot {
                             return;
                         }
 
-                        if let Some(news) =
-                            utils::create_news_by_event(related_event, &related_event_sender)
-                        {
+                        if let Some(message) = utils::get_message_event_text(related_event, true) {
+                            let news =
+                                News::new(related_event_id.clone(), &related_event_sender, message);
                             self.add_news(news, false).await;
                             None
                         } else {
                             Some(format!(
                                 "❌ Unable to add {}’s message as news, invalid event/message type. [{}]",
-                                related_event.sender(),
+                                related_event.sender,
                                 link,
                             ))
                         }
@@ -488,11 +486,11 @@ impl Bot {
                         let reporter_id = reaction_sender.user_id();
                         let news_store = self.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
-                            related_event.sender().as_ref(),
+                            related_event.sender.as_ref(),
                             &related_event_timestamp,
                         ) {
                             if !sender_is_editor
-                                && (reaction_sender.user_id() != related_event.sender()
+                                && (reaction_sender.user_id() != related_event.sender
                                     && self.config.restrict_notice)
                             {
                                 return;
@@ -500,7 +498,7 @@ impl Bot {
                             if let MediaSource::Plain(mxc_uri) = &image.source {
                                 news.add_image(
                                     reaction_event_id.to_owned(),
-                                    related_event_id.into(),
+                                    related_event_id.clone(),
                                     image.body.clone(),
                                     mxc_uri.clone(),
                                 );
@@ -534,13 +532,13 @@ impl Bot {
                         let reporter_id = reaction_sender.user_id();
                         let news_store = self.news_store.lock().unwrap();
                         if let Some(news) = news_store.find_related_news(
-                            related_event.sender().as_ref(),
+                            related_event.sender.as_ref(),
                             &related_event_timestamp,
                         ) {
                             if let MediaSource::Plain(mxc_uri) = &video.source {
                                 news.add_video(
                                     reaction_event_id.to_owned(),
-                                    related_event_id.into(),
+                                    related_event_id.clone(),
                                     video.body.clone(),
                                     mxc_uri.clone(),
                                 );
@@ -566,7 +564,7 @@ impl Bot {
                         link
                     )),
                 },
-                _ => {
+                related_message_type => {
                     debug!(
                         "Unsupported message type {:?} (id {}",
                         related_message_type, related_event_id
