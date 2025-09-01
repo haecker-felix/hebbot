@@ -278,20 +278,22 @@ impl Bot {
 
     /// Handling room redaction events (= something got removed/reverted)
     async fn on_room_redaction(event: SyncRoomRedactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
-        // FIXME: Function parameter should be OriginalSyncRoomRedactionEvent.
-        // Doesn't currently compile, needs a fix in the matrix-rust-sdk.
-        if let SyncRoomRedactionEvent::Original(event) = event {
-            if room.state() != RoomState::Joined {
-                return;
-            }
-            let redacted_event_id = event.redacts.clone().unwrap();
-            let member = room.get_member(&event.sender).await.unwrap().unwrap();
+        // In some room versions, the redacts field of the redaction event can be redacted,
+        // so we return early if we don't know which event was redacted.
+        let room_version = room.clone_info().room_version_or_default();
+        let Some(redacted_event_id) = event.redacts(&room_version) else {
+            return;
+        };
 
-            // Reporting room
-            if room.room_id() == bot.reporting_room.room_id() {
-                bot.on_reporting_room_redaction(&member, &redacted_event_id)
-                    .await;
-            }
+        if room.state() != RoomState::Joined {
+            return;
+        }
+        let member = room.get_member(event.sender()).await.unwrap().unwrap();
+
+        // Reporting room
+        if room.room_id() == bot.reporting_room.room_id() {
+            bot.on_reporting_room_redaction(&member, redacted_event_id)
+                .await;
         }
     }
 
