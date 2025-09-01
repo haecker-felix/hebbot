@@ -316,16 +316,8 @@ impl Bot {
             return;
         }
 
-        let reporter_id = member.user_id();
-        let reporter_display_name = utils::get_member_display_name(member);
-
         // Create new news entry...
-        let news = News::new(
-            event_id.to_owned(),
-            reporter_id.to_owned(),
-            reporter_display_name,
-            message,
-        );
+        let news = News::new(event_id.to_owned(), member, message);
         self.add_news(news, true).await;
     }
 

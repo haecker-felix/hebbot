@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use std::sync::LazyLock;
 
-use crate::{utils, Config, News, Project, Section};
+use crate::{Config, News, Project, Section};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct RenderNews {
@@ -300,7 +300,7 @@ pub fn render(
             sections => render_sections,
             projects => project_names,
             config => config,
-            editor => utils::get_member_display_name(editor),
+            editor => editor.name(),
         })?;
 
     Ok(RenderResult {

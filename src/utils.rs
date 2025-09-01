@@ -9,7 +9,6 @@ use matrix_sdk::ruma::events::{
     AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
 };
 use matrix_sdk::ruma::{EventId, OwnedEventId, UserId};
-use matrix_sdk::BaseRoomMember;
 use regex::Regex;
 
 use std::fmt::Write;
@@ -38,21 +37,13 @@ pub fn create_news_by_event(
                         | MessageType::Notice(NoticeMessageEventContent { body, .. }),
                     ..
                 },
-            sender,
             ..
         }),
     )) = any_room_event
     {
-        let reporter_id = sender.to_owned();
-        let reporter_display_name = get_member_display_name(member);
         let message = body.clone();
 
-        let news = News::new(
-            any_room_event.event_id().to_owned(),
-            reporter_id,
-            reporter_display_name,
-            message,
-        );
+        let news = News::new(any_room_event.event_id().to_owned(), member, message);
 
         Some(news)
     } else {
@@ -106,15 +97,6 @@ pub fn get_edited_message_event_text(
     }
 
     None
-}
-
-/// Gets display name for a RoomMember
-/// falls back to user_id for accounts without displayname
-pub fn get_member_display_name(member: &BaseRoomMember) -> String {
-    member
-        .display_name()
-        .unwrap_or_else(|| member.user_id().as_str())
-        .to_string()
 }
 
 /// Checks if a message starts with a user_id mention

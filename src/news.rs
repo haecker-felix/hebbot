@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use matrix_sdk::room::RoomMember;
 use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedMxcUri, OwnedUserId};
 use serde::{Deserialize, Serialize};
 
@@ -23,12 +24,10 @@ pub struct News {
 }
 
 impl News {
-    pub fn new(
-        event_id: OwnedEventId,
-        reporter_id: OwnedUserId,
-        reporter_display_name: String,
-        message: String,
-    ) -> Self {
+    pub fn new(event_id: OwnedEventId, reporter: &RoomMember, message: String) -> Self {
+        let reporter_id = reporter.user_id().to_owned();
+        let reporter_display_name = reporter.name().to_owned();
+
         Self {
             event_id,
             reporter_id,
