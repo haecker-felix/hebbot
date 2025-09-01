@@ -6,8 +6,7 @@ use matrix_sdk::ruma::events::room::message::{
     RoomMessageEventContent, TextMessageEventContent,
 };
 use matrix_sdk::ruma::events::{
-    AnyMessageLikeEvent, AnySyncTimelineEvent, AnyTimelineEvent, MessageLikeEvent,
-    OriginalMessageLikeEvent,
+    AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
 };
 use matrix_sdk::ruma::{EventId, OwnedEventId, UserId};
 use matrix_sdk::BaseRoomMember;
@@ -20,9 +19,9 @@ use std::{env, str};
 
 use crate::News;
 
-/// Try to convert a `AnyTimelineEvent` into a `News`
+/// Try to convert a `AnySyncTimelineEvent` into a `News`
 pub fn create_news_by_event(
-    any_room_event: &AnyTimelineEvent,
+    any_room_event: &AnySyncTimelineEvent,
     member: &RoomMember,
 ) -> Option<News> {
     // Fetch related event's
@@ -30,8 +29,8 @@ pub fn create_news_by_event(
     // * reporter_id
     // * reporter_display_name
     // * message
-    if let AnyTimelineEvent::MessageLike(AnyMessageLikeEvent::RoomMessage(
-        MessageLikeEvent::Original(OriginalMessageLikeEvent {
+    if let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(
+        SyncMessageLikeEvent::Original(OriginalSyncRoomMessageEvent {
             content:
                 RoomMessageEventContent {
                     msgtype:
@@ -62,19 +61,11 @@ pub fn create_news_by_event(
 }
 
 /// Get room message by event id
-pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyTimelineEvent> {
+pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnySyncTimelineEvent> {
     let timeline_event = room.event(event_id, None).await.ok()?;
 
     match timeline_event.kind {
-        TimelineEventKind::PlainText { event } => match event.deserialize().ok() {
-            Some(AnySyncTimelineEvent::MessageLike(event)) => {
-                Some(event.into_full_event(room.room_id().into()).into())
-            }
-            Some(AnySyncTimelineEvent::State(event)) => {
-                Some(event.into_full_event(room.room_id().into()).into())
-            }
-            None => None,
-        },
+        TimelineEventKind::PlainText { event } => event.deserialize().ok(),
         ev => {
             // This covers the other variants: DecryptedRoomEvent and UnableToDecrypt.
             // At the moment Hebbot does not support being used in encrypted rooms.
@@ -84,9 +75,9 @@ pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyTime
     }
 }
 
-pub async fn message_type(room_event: &AnyTimelineEvent) -> Option<MessageType> {
-    if let AnyTimelineEvent::MessageLike(AnyMessageLikeEvent::RoomMessage(
-        MessageLikeEvent::Original(ev),
+pub async fn message_type(room_event: &AnySyncTimelineEvent) -> Option<MessageType> {
+    if let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(
+        SyncMessageLikeEvent::Original(ev),
     )) = room_event
     {
         Some(ev.content.msgtype.clone())

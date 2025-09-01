@@ -10,7 +10,7 @@ use matrix_sdk::ruma::events::room::message::{
 };
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
 use matrix_sdk::ruma::events::room::MediaSource;
-use matrix_sdk::ruma::events::{AnyTimelineEvent, Mentions};
+use matrix_sdk::ruma::events::{AnySyncTimelineEvent, Mentions};
 use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, ServerName, UserId};
 use matrix_sdk::{Client, Room, RoomState};
 
@@ -378,7 +378,7 @@ impl Bot {
         reaction_sender: &RoomMember,
         reaction_emoji: &str,
         reaction_event_id: &EventId,
-        related_event: &AnyTimelineEvent,
+        related_event: &AnySyncTimelineEvent,
         related_message_type: &MessageType,
     ) {
         let reaction_emoji = reaction_emoji.strip_suffix(" ?").unwrap_or(reaction_emoji);
