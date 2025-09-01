@@ -22,6 +22,7 @@ use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 
+use crate::utils::MessageEventExt;
 use crate::{render, utils, BotMessageType as BotMsgType, Config, News, NewsStore, ReactionType};
 
 #[derive(Clone)]
@@ -204,34 +205,30 @@ impl Bot {
             return;
         }
 
+        // Message edit
+        if let Some(edited_msg_event_id) = event.edited_event_id() {
+            if let Some(text) = event.text(false) {
+                // Reporting room
+                if room.room_id() == bot.reporting_room.room_id() {
+                    bot.on_reporting_room_msg_edit(text, edited_msg_event_id)
+                        .await;
+                }
+            }
+        }
         // Standard text message
-        if let Some(text) = utils::get_message_event_text(&event, false) {
+        else if let Some(text) = event.text(false) {
             let member = room.get_member(&event.sender).await.unwrap().unwrap();
             let id = &event.event_id;
 
             // Reporting room
             if room.room_id() == bot.reporting_room.room_id() {
-                bot.on_reporting_room_msg(
-                    text.clone(),
-                    event.content.mentions.as_ref(),
-                    &member,
-                    id,
-                )
-                .await;
+                bot.on_reporting_room_msg(text, event.content.mentions.as_ref(), &member, id)
+                    .await;
             }
 
             // Admin room
             if room.room_id() == bot.admin_room.room_id() {
                 bot.on_admin_room_message(text, &member).await;
-            }
-        }
-
-        // Message edit
-        if let Some((edited_msg_event_id, text)) = utils::get_edited_message_event_text(&event) {
-            // Reporting room
-            if room.room_id() == bot.reporting_room.room_id() {
-                bot.on_reporting_room_msg_edit(text.clone(), &edited_msg_event_id)
-                    .await;
             }
         }
     }
@@ -300,7 +297,7 @@ impl Bot {
     ///   stored as News in NewsStore
     async fn on_reporting_room_msg(
         &self,
-        message: String,
+        message: &str,
         mentions: Option<&Mentions>,
         member: &RoomMember,
         event_id: &EventId,
@@ -310,13 +307,13 @@ impl Bot {
         let bot_id = self.client.user_id().unwrap();
         let bot_display_name = self.client.account().get_display_name().await.unwrap();
         if mentions.is_none_or(|mentions| !mentions.user_ids.contains(bot_id))
-            && !utils::msg_starts_with_mention(bot_id, bot_display_name, message.clone())
+            && !utils::msg_starts_with_mention(bot_id, bot_display_name, message)
         {
             return;
         }
 
         // Create new news entry...
-        let news = News::new(event_id.to_owned(), member, message);
+        let news = News::new(event_id.to_owned(), member, message.to_owned());
         self.add_news(news, true).await;
     }
 
@@ -325,12 +322,12 @@ impl Bot {
     ///   the message will get stored as News in NewsStore
     async fn on_reporting_room_msg_edit(
         &self,
-        updated_message: String,
+        updated_message: &str,
         edited_msg_event_id: &EventId,
     ) {
         let bot_id = self.client.user_id().unwrap();
         let bot_display_name = self.client.account().get_display_name().await.ok().unwrap();
-        let updated_message = utils::remove_bot_name(bot_id, bot_display_name, &updated_message);
+        let updated_message = utils::remove_bot_name(bot_id, bot_display_name, updated_message);
         let link = self.message_link(edited_msg_event_id);
 
         let message = {
@@ -403,85 +400,78 @@ impl Bot {
                 return;
             }
 
-            let msg = match &related_event.content.msgtype {
-                MessageType::Text(_) | MessageType::Notice(_) => {
-                    // Check if the reaction == notice emoji,
-                    // Yes -> Try to add the message as news submission
-                    let msg = if utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji) {
-                        // we need related_event's sender
-                        let related_event_sender = room
-                            .get_member(&related_event.sender)
-                            .await
-                            .unwrap()
-                            .unwrap();
+            if let Some(text) = related_event.text(true) {
+                // Check if the reaction == notice emoji,
+                // Yes -> Try to add the message as news submission
+                if utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji) {
+                    // we need related_event's sender
+                    let related_event_sender = room
+                        .get_member(&related_event.sender)
+                        .await
+                        .unwrap()
+                        .unwrap();
 
-                        if !sender_is_editor
-                            && (reaction_sender.user_id() != related_event_sender.user_id()
-                                && self.config.restrict_notice)
-                        {
-                            return;
-                        }
+                    if !sender_is_editor
+                        && (reaction_sender.user_id() != related_event_sender.user_id()
+                            && self.config.restrict_notice)
+                    {
+                        return;
+                    }
 
-                        if let Some(message) = utils::get_message_event_text(related_event, true) {
-                            let news =
-                                News::new(related_event_id.clone(), &related_event_sender, message);
-                            self.add_news(news, false).await;
-                            None
-                        } else {
+                    let news = News::new(
+                        related_event_id.clone(),
+                        &related_event_sender,
+                        text.to_owned(),
+                    );
+                    self.add_news(news, false).await;
+                    None
+                }
+                // Check if related message is a news entry
+                // (Adding the entry to a project / section by using the corresponding reaction emoji)
+                else if let Some(news) = self
+                    .news_store
+                    .lock()
+                    .unwrap()
+                    .news_by_message_id(related_event_id)
+                {
+                    match reaction_type {
+                        ReactionType::Section(section) => {
+                            let section = section.unwrap();
+                            news.add_section_name(reaction_event_id.to_owned(), section.name);
                             Some(format!(
-                                "❌ Unable to add {}’s message as news, invalid event/message type. [{}]",
-                                related_event.sender,
+                                "✅ {} added {}’s news entry [{}] to the “{}” section.",
+                                reaction_sender.user_id(),
+                                news.reporter_id,
                                 link,
+                                section.title
                             ))
                         }
-
-                    // Check if related message is a news entry
-                    // (Adding the entry to a project / section by using the corresponding reaction emoji)
-                    } else if let Some(news) = self
-                        .news_store
-                        .lock()
-                        .unwrap()
-                        .news_by_message_id(related_event_id)
-                    {
-                        match reaction_type {
-                            ReactionType::Section(section) => {
-                                let section = section.unwrap();
-                                news.add_section_name(reaction_event_id.to_owned(), section.name);
-                                Some(format!(
-                                    "✅ {} added {}’s news entry [{}] to the “{}” section.",
-                                    reaction_sender.user_id(),
-                                    news.reporter_id,
-                                    link,
-                                    section.title
-                                ))
-                            }
-                            ReactionType::Project(project) => {
-                                let project = project.unwrap();
-                                news.add_project_name(reaction_event_id.to_owned(), project.name);
-                                Some(format!(
-                                    "✅ {} added the project description “{}” to {}’s news entry [{}].",
-                                    reaction_sender.user_id(),
-                                    project.title,
-                                    news.reporter_id,
-                                    link
-                                ))
-                            }
-                            _ => None,
+                        ReactionType::Project(project) => {
+                            let project = project.unwrap();
+                            news.add_project_name(reaction_event_id.to_owned(), project.name);
+                            Some(format!(
+                                "✅ {} added the project description “{}” to {}’s news entry [{}].",
+                                reaction_sender.user_id(),
+                                project.title,
+                                news.reporter_id,
+                                link
+                            ))
                         }
-                    } else {
-                        Some(format!(
+                        _ => None,
+                    }
+                } else {
+                    Some(format!(
                             "⚠️ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
                             reaction_sender.user_id(),
                             reaction_type,
                             link,
                             related_event_id
                         ))
-                    };
-                    msg
                 }
-
-                // Check if related message is an image
-                MessageType::Image(image) => match reaction_type {
+            }
+            // Check if related message is an image
+            else if let Some(image) = related_event.image() {
+                match reaction_type {
                     ReactionType::Notice => {
                         let reporter_id = reaction_sender.user_id();
                         let news_store = self.news_store.lock().unwrap();
@@ -524,10 +514,11 @@ impl Bot {
                         reaction_sender.user_id(),
                         link
                     )),
-                },
-
-                // Check if related message is a video
-                MessageType::Video(video) => match reaction_type {
+                }
+            }
+            // Check if related message is a video
+            else if let Some(video) = related_event.video() {
+                match reaction_type {
                     ReactionType::Notice => {
                         let reporter_id = reaction_sender.user_id();
                         let news_store = self.news_store.lock().unwrap();
@@ -563,16 +554,15 @@ impl Bot {
                         reaction_sender.user_id(),
                         link
                     )),
-                },
-                related_message_type => {
-                    debug!(
-                        "Unsupported message type {:?} (id {}",
-                        related_message_type, related_event_id
-                    );
-                    None
                 }
-            };
-            msg
+            } else {
+                debug!(
+                    "Unsupported message type {:?} (id {}",
+                    related_event.msgtype(),
+                    related_event_id
+                );
+                None
+            }
         };
 
         // Send confirm message to admin room
@@ -651,11 +641,11 @@ impl Bot {
 
     /// New message in admin room
     /// This is just for administrative stuff (eg. commands)
-    async fn on_admin_room_message(&self, msg: String, member: &RoomMember) {
-        let msg = msg.trim().to_string();
+    async fn on_admin_room_message(&self, msg: &str, member: &RoomMember) {
+        let msg = msg.trim();
 
         // Check if the message is a command
-        if !msg.as_str().starts_with('!') {
+        if !msg.starts_with('!') {
             return;
         }
 

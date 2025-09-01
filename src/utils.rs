@@ -2,19 +2,96 @@ use async_process::{Command, Stdio};
 use matrix_sdk::deserialized_responses::TimelineEventKind;
 use matrix_sdk::room::Room;
 use matrix_sdk::ruma::events::room::message::{
-    MessageType, NoticeMessageEventContent, OriginalSyncRoomMessageEvent, Relation,
-    TextMessageEventContent,
+    ImageMessageEventContent, MessageType, NoticeMessageEventContent, OriginalSyncRoomMessageEvent,
+    Relation, TextMessageEventContent, VideoMessageEventContent,
 };
 use matrix_sdk::ruma::events::{
     AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
 };
-use matrix_sdk::ruma::{EventId, OwnedEventId, UserId};
+use matrix_sdk::ruma::{EventId, UserId};
 use regex::Regex;
 
 use std::fmt::Write;
 use std::fs::File;
 use std::io::Read;
 use std::{env, str};
+
+/// Helper trait for room message events.
+///
+/// The main feature of this trait is that it always fetches the message
+/// content in the appropriate place:
+///
+/// - If there is a latest edit in `unsigned`, use its message type
+/// - If this is an edit, use it the `new_content`
+/// - Otherwise, use the `content`
+pub trait MessageEventExt {
+    /// The message type.
+    fn msgtype(&self) -> &MessageType;
+
+    ///If this message is an edit, the related event ID.
+    fn edited_event_id(&self) -> Option<&EventId>;
+
+    /// The text of the message, if any.
+    fn text(&self, allow_notice: bool) -> Option<&str>;
+
+    /// The image of the message, if any.
+    fn image(&self) -> Option<&ImageMessageEventContent>;
+
+    /// The video of the message, if any.
+    fn video(&self) -> Option<&VideoMessageEventContent>;
+}
+
+impl MessageEventExt for OriginalSyncRoomMessageEvent {
+    fn msgtype(&self) -> &MessageType {
+        if let Some(Relation::Replacement(edit)) = self
+            .unsigned
+            .relations
+            .replace
+            .as_deref()
+            .and_then(|edit| edit.content.relates_to.as_ref())
+        {
+            &edit.new_content.msgtype
+        } else if let Some(Relation::Replacement(edit)) = &self.content.relates_to {
+            &edit.new_content.msgtype
+        } else {
+            &self.content.msgtype
+        }
+    }
+
+    fn edited_event_id(&self) -> Option<&EventId> {
+        if let Some(Relation::Replacement(edit)) = &self.content.relates_to {
+            Some(&edit.event_id)
+        } else {
+            None
+        }
+    }
+
+    fn text(&self, allow_notice: bool) -> Option<&str> {
+        match self.msgtype() {
+            MessageType::Text(TextMessageEventContent { body, .. }) => Some(body),
+            MessageType::Notice(NoticeMessageEventContent { body, .. }) if allow_notice => {
+                Some(body)
+            }
+            _ => None,
+        }
+    }
+
+    fn image(&self) -> Option<&ImageMessageEventContent> {
+        if let MessageType::Image(content) = self.msgtype() {
+            Some(content)
+        } else {
+            None
+        }
+    }
+
+    fn video(&self) -> Option<&VideoMessageEventContent> {
+        if let MessageType::Video(content) = self.msgtype() {
+            Some(content)
+        } else {
+            None
+        }
+    }
+}
 
 /// Get room message by event id
 pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnySyncTimelineEvent> {
@@ -45,39 +122,9 @@ pub fn as_message_event(
     }
 }
 
-/// A simplified way of getting the text from a message event
-pub fn get_message_event_text(
-    event: &OriginalSyncRoomMessageEvent,
-    allow_notice: bool,
-) -> Option<String> {
-    match &event.content.msgtype {
-        MessageType::Text(TextMessageEventContent { body, .. }) => Some(body),
-        MessageType::Notice(NoticeMessageEventContent { body, .. }) if allow_notice => Some(body),
-        _ => None,
-    }
-    .cloned()
-}
-
-/// A simplified way of getting an edited message
-pub fn get_edited_message_event_text(
-    event: &OriginalSyncRoomMessageEvent,
-) -> Option<(OwnedEventId, String)> {
-    if let Some(Relation::Replacement(r)) = &event.content.relates_to {
-        if let MessageType::Text(TextMessageEventContent { body, .. }) = &r.new_content.msgtype {
-            return Some((r.event_id.clone(), body.to_owned()));
-        }
-    }
-
-    None
-}
-
 /// Checks if a message starts with a user_id mention
 /// Automatically handles @ in front of the name
-pub fn msg_starts_with_mention(
-    user_id: &UserId,
-    display_name: Option<String>,
-    msg: String,
-) -> bool {
+pub fn msg_starts_with_mention(user_id: &UserId, display_name: Option<String>, msg: &str) -> bool {
     let localpart = user_id.localpart().to_lowercase();
     // Catch "@botname ..." messages
     let msg = msg.replace(&format!("@{}", localpart), &localpart);
