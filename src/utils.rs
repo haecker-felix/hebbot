@@ -1,16 +1,14 @@
 use async_process::{Command, Stdio};
 use matrix_sdk::deserialized_responses::TimelineEventKind;
-use matrix_sdk::room::{Room, RoomMember};
+use matrix_sdk::room::Room;
 use matrix_sdk::ruma::events::room::message::{
-    MessageType, NoticeMessageEventContent, OriginalSyncRoomMessageEvent, Relation,
-    RoomMessageEventContent, TextMessageEventContent,
+    ImageMessageEventContent, MessageType, NoticeMessageEventContent, OriginalSyncRoomMessageEvent,
+    Relation, TextMessageEventContent, VideoMessageEventContent,
 };
 use matrix_sdk::ruma::events::{
-    AnyMessageLikeEvent, AnySyncTimelineEvent, AnyTimelineEvent, MessageLikeEvent,
-    OriginalMessageLikeEvent,
+    AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
 };
-use matrix_sdk::ruma::{EventId, OwnedEventId, UserId};
-use matrix_sdk::BaseRoomMember;
+use matrix_sdk::ruma::{EventId, UserId};
 use regex::Regex;
 
 use std::fmt::Write;
@@ -18,63 +16,89 @@ use std::fs::File;
 use std::io::Read;
 use std::{env, str};
 
-use crate::News;
+/// Helper trait for room message events.
+///
+/// The main feature of this trait is that it always fetches the message
+/// content in the appropriate place:
+///
+/// - If there is a latest edit in `unsigned`, use its message type
+/// - If this is an edit, use it the `new_content`
+/// - Otherwise, use the `content`
+pub trait MessageEventExt {
+    /// The message type.
+    fn msgtype(&self) -> &MessageType;
 
-/// Try to convert a `AnyTimelineEvent` into a `News`
-pub fn create_news_by_event(
-    any_room_event: &AnyTimelineEvent,
-    member: &RoomMember,
-) -> Option<News> {
-    // Fetch related event's
-    // * event_id
-    // * reporter_id
-    // * reporter_display_name
-    // * message
-    if let AnyTimelineEvent::MessageLike(AnyMessageLikeEvent::RoomMessage(
-        MessageLikeEvent::Original(OriginalMessageLikeEvent {
-            content:
-                RoomMessageEventContent {
-                    msgtype:
-                        MessageType::Text(TextMessageEventContent { body, .. })
-                        | MessageType::Notice(NoticeMessageEventContent { body, .. }),
-                    ..
-                },
-            sender,
-            ..
-        }),
-    )) = any_room_event
-    {
-        let reporter_id = sender.to_owned();
-        let reporter_display_name = get_member_display_name(member);
-        let message = body.clone();
+    ///If this message is an edit, the related event ID.
+    fn edited_event_id(&self) -> Option<&EventId>;
 
-        let news = News::new(
-            any_room_event.event_id().to_owned(),
-            reporter_id,
-            reporter_display_name,
-            message,
-        );
+    /// The text of the message, if any.
+    fn text(&self, allow_notice: bool) -> Option<&str>;
 
-        Some(news)
-    } else {
-        None
+    /// The image of the message, if any.
+    fn image(&self) -> Option<&ImageMessageEventContent>;
+
+    /// The video of the message, if any.
+    fn video(&self) -> Option<&VideoMessageEventContent>;
+}
+
+impl MessageEventExt for OriginalSyncRoomMessageEvent {
+    fn msgtype(&self) -> &MessageType {
+        if let Some(Relation::Replacement(edit)) = self
+            .unsigned
+            .relations
+            .replace
+            .as_deref()
+            .and_then(|edit| edit.content.relates_to.as_ref())
+        {
+            &edit.new_content.msgtype
+        } else if let Some(Relation::Replacement(edit)) = &self.content.relates_to {
+            &edit.new_content.msgtype
+        } else {
+            &self.content.msgtype
+        }
+    }
+
+    fn edited_event_id(&self) -> Option<&EventId> {
+        if let Some(Relation::Replacement(edit)) = &self.content.relates_to {
+            Some(&edit.event_id)
+        } else {
+            None
+        }
+    }
+
+    fn text(&self, allow_notice: bool) -> Option<&str> {
+        match self.msgtype() {
+            MessageType::Text(TextMessageEventContent { body, .. }) => Some(body),
+            MessageType::Notice(NoticeMessageEventContent { body, .. }) if allow_notice => {
+                Some(body)
+            }
+            _ => None,
+        }
+    }
+
+    fn image(&self) -> Option<&ImageMessageEventContent> {
+        if let MessageType::Image(content) = self.msgtype() {
+            Some(content)
+        } else {
+            None
+        }
+    }
+
+    fn video(&self) -> Option<&VideoMessageEventContent> {
+        if let MessageType::Video(content) = self.msgtype() {
+            Some(content)
+        } else {
+            None
+        }
     }
 }
 
 /// Get room message by event id
-pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyTimelineEvent> {
+pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnySyncTimelineEvent> {
     let timeline_event = room.event(event_id, None).await.ok()?;
 
     match timeline_event.kind {
-        TimelineEventKind::PlainText { event } => match event.deserialize().ok() {
-            Some(AnySyncTimelineEvent::MessageLike(event)) => {
-                Some(event.into_full_event(room.room_id().into()).into())
-            }
-            Some(AnySyncTimelineEvent::State(event)) => {
-                Some(event.into_full_event(room.room_id().into()).into())
-            }
-            None => None,
-        },
+        TimelineEventKind::PlainText { event } => event.deserialize().ok(),
         ev => {
             // This covers the other variants: DecryptedRoomEvent and UnableToDecrypt.
             // At the moment Hebbot does not support being used in encrypted rooms.
@@ -84,55 +108,23 @@ pub async fn room_event_by_id(room: &Room, event_id: &EventId) -> Option<AnyTime
     }
 }
 
-pub async fn message_type(room_event: &AnyTimelineEvent) -> Option<MessageType> {
-    if let AnyTimelineEvent::MessageLike(AnyMessageLikeEvent::RoomMessage(
-        MessageLikeEvent::Original(ev),
+/// Get the given event as a message event, if it is one.
+pub fn as_message_event(
+    room_event: &AnySyncTimelineEvent,
+) -> Option<&OriginalSyncRoomMessageEvent> {
+    if let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(
+        SyncMessageLikeEvent::Original(ev),
     )) = room_event
     {
-        Some(ev.content.msgtype.clone())
+        Some(ev)
     } else {
         None
     }
-}
-
-/// A simplified way of getting the text from a message event
-pub fn get_message_event_text(event: &OriginalSyncRoomMessageEvent) -> Option<String> {
-    if let MessageType::Text(TextMessageEventContent { body, .. }) = &event.content.msgtype {
-        Some(body.to_owned())
-    } else {
-        None
-    }
-}
-
-/// A simplified way of getting an edited message
-pub fn get_edited_message_event_text(
-    event: &OriginalSyncRoomMessageEvent,
-) -> Option<(OwnedEventId, String)> {
-    if let Some(Relation::Replacement(r)) = &event.content.relates_to {
-        if let MessageType::Text(TextMessageEventContent { body, .. }) = &r.new_content.msgtype {
-            return Some((r.event_id.clone(), body.to_owned()));
-        }
-    }
-
-    None
-}
-
-/// Gets display name for a RoomMember
-/// falls back to user_id for accounts without displayname
-pub fn get_member_display_name(member: &BaseRoomMember) -> String {
-    member
-        .display_name()
-        .unwrap_or_else(|| member.user_id().as_str())
-        .to_string()
 }
 
 /// Checks if a message starts with a user_id mention
 /// Automatically handles @ in front of the name
-pub fn msg_starts_with_mention(
-    user_id: &UserId,
-    display_name: Option<String>,
-    msg: String,
-) -> bool {
+pub fn msg_starts_with_mention(user_id: &UserId, display_name: Option<String>, msg: &str) -> bool {
     let localpart = user_id.localpart().to_lowercase();
     // Catch "@botname ..." messages
     let msg = msg.replace(&format!("@{}", localpart), &localpart);
