@@ -276,8 +276,8 @@ impl Bot {
     async fn on_room_redaction(event: SyncRoomRedactionEvent, room: Room, Ctx(bot): Ctx<Bot>) {
         // In some room versions, the redacts field of the redaction event can be redacted,
         // so we return early if we don't know which event was redacted.
-        let room_version = room.clone_info().room_version_or_default();
-        let Some(redacted_event_id) = event.redacts(&room_version) else {
+        let room_version = room.clone_info().room_version_rules_or_default();
+        let Some(redacted_event_id) = event.redacts(&room_version.redaction) else {
             return;
         };
 
