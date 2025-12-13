@@ -222,10 +222,10 @@ mod tests {
     use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
     use matrix_sdk::ruma::events::room::MediaSource;
     use matrix_sdk::ruma::serde::JsonObject;
-    use matrix_sdk::ruma::{event_id, EventId};
+    use matrix_sdk::ruma::{event_id, user_id, EventId, UserId};
     use serde_json::json;
 
-    use super::MessageEventExt;
+    use super::{msg_starts_with_mention, remove_bot_name, MessageEventExt};
 
     static ORIGINAL_EVENT_ID: LazyLock<&'static EventId> = LazyLock::new(|| event_id!("$original"));
     static EDIT_EVENT_ID: LazyLock<&'static EventId> = LazyLock::new(|| event_id!("$edit"));
@@ -512,5 +512,172 @@ mod tests {
         assert_eq!(video.body, "edited_video.webm");
         assert_matches!(&video.source, MediaSource::Plain(uri));
         assert_eq!(uri, "mxc://matrix.local/56789");
+    }
+
+    #[test]
+    fn msg_starts_with_mention_and_remove_bot_name() {
+        let lowercase_user_id = user_id!("@hebbot:matrix.local");
+        let uppercase_user_id = <&UserId>::try_from("@HEBBOT:matrix.local").unwrap();
+        let lowercase_display_name = "the hebbot".to_owned();
+        let uppercase_display_name = "THE HEBBOT".to_owned();
+
+        let content = "This is my entry";
+
+        let matching_localpart_prefixes = &[
+            "hebbot: ",
+            "@hebbot: ",
+            "HEBBOT: ",
+            "hebbot ",
+            "@hebbot ",
+            "HEBBOT ",
+        ];
+
+        for prefix in matching_localpart_prefixes {
+            let message = format!("{prefix}{content}");
+
+            // Log the message for debugging when the check fails.
+            println!("Checking message: `{message}`");
+
+            // Lowercase user ID and display name.
+            assert!(msg_starts_with_mention(
+                lowercase_user_id,
+                Some(lowercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    lowercase_user_id,
+                    Some(lowercase_display_name.clone()),
+                    &message,
+                ),
+                content
+            );
+
+            // Lowercase user ID no display name.
+            assert!(msg_starts_with_mention(lowercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(lowercase_user_id, None, &message), content);
+
+            // Uppercase user ID and display name.
+            assert!(msg_starts_with_mention(
+                uppercase_user_id,
+                Some(uppercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    uppercase_user_id,
+                    Some(uppercase_display_name.clone()),
+                    &message,
+                ),
+                content
+            );
+
+            // Uppercase user ID no display name.
+            assert!(msg_starts_with_mention(uppercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(uppercase_user_id, None, &message), content);
+        }
+
+        let matching_display_name_prefixes =
+            &["the hebbot: ", "THE HEBBOT: ", "the hebbot ", "THE HEBBOT "];
+
+        for prefix in matching_display_name_prefixes {
+            let message = format!("{prefix}{content}");
+
+            // Log the message for debugging when the check fails.
+            println!("Checking message: `{message}`");
+
+            // Lowercase user ID and display name.
+            assert!(msg_starts_with_mention(
+                lowercase_user_id,
+                Some(lowercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    lowercase_user_id,
+                    Some(lowercase_display_name.clone()),
+                    &message,
+                ),
+                content
+            );
+
+            // Lowercase user ID no display name.
+            assert!(!msg_starts_with_mention(lowercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(lowercase_user_id, None, &message), message);
+
+            // Uppercase user ID and display name.
+            assert!(msg_starts_with_mention(
+                uppercase_user_id,
+                Some(uppercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    uppercase_user_id,
+                    Some(uppercase_display_name.clone()),
+                    &message,
+                ),
+                content
+            );
+
+            // Uppercase user ID no display name.
+            assert!(!msg_starts_with_mention(uppercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(uppercase_user_id, None, &message), message);
+        }
+
+        let not_matching_prefixes = &[
+            "[hebbot] ",
+            "[@hebbot] ",
+            "[HEBBOT] ",
+            "[the hebbot] ",
+            "[THE HEBBOT] ",
+            "heb bot ",
+            "@the hebbot",
+        ];
+
+        for prefix in not_matching_prefixes {
+            let message = format!("{prefix}{content}");
+
+            // Log the message for debugging when the check fails.
+            println!("Checking message: `{message}`");
+
+            // Lowercase user ID and display name.
+            assert!(!msg_starts_with_mention(
+                lowercase_user_id,
+                Some(lowercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    lowercase_user_id,
+                    Some(lowercase_display_name.clone()),
+                    &message,
+                ),
+                message
+            );
+
+            // Lowercase user ID no display name.
+            assert!(!msg_starts_with_mention(lowercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(lowercase_user_id, None, &message), message);
+
+            // Uppercase user ID and display name.
+            assert!(!msg_starts_with_mention(
+                uppercase_user_id,
+                Some(uppercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    uppercase_user_id,
+                    Some(uppercase_display_name.clone()),
+                    &message,
+                ),
+                message
+            );
+
+            // Uppercase user ID no display name.
+            assert!(!msg_starts_with_mention(uppercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(uppercase_user_id, None, &message), message);
+        }
     }
 }
