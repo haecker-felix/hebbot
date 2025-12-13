@@ -213,3 +213,471 @@ pub fn file_from_env(env_var_name: &str, fallback: &str) -> String {
 
     template
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::LazyLock;
+
+    use assert_matches2::assert_matches;
+    use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
+    use matrix_sdk::ruma::events::room::MediaSource;
+    use matrix_sdk::ruma::serde::JsonObject;
+    use matrix_sdk::ruma::{event_id, user_id, EventId, UserId};
+    use serde_json::json;
+
+    use super::{msg_starts_with_mention, remove_bot_name, MessageEventExt};
+
+    static ORIGINAL_EVENT_ID: LazyLock<&'static EventId> = LazyLock::new(|| event_id!("$original"));
+    static EDIT_EVENT_ID: LazyLock<&'static EventId> = LazyLock::new(|| event_id!("$edit"));
+
+    /// Construct an `m.room.message` event with the given JSON content.
+    fn room_message_event(event_id: &EventId, content: serde_json::Value) -> serde_json::Value {
+        json!({
+            "content": content,
+            "type": "m.room.message",
+            "event_id": event_id,
+            "sender": "@user:matrix.local",
+            "origin_server_ts": 1_000_000,
+        })
+    }
+
+    /// Add the given edit to the `m.relations` object of the `unsigned` object of the given original event.
+    fn insert_aggregated_edit(original: &mut serde_json::Value, edit: serde_json::Value) {
+        let original = original.as_object_mut().unwrap();
+        let unsigned = original
+            .entry("unsigned")
+            .or_insert_with(|| JsonObject::new().into())
+            .as_object_mut()
+            .unwrap();
+        let relations = unsigned
+            .entry("m.relations")
+            .or_insert_with(|| JsonObject::new().into())
+            .as_object_mut()
+            .unwrap();
+
+        relations.insert("m.replace".to_owned(), edit);
+    }
+
+    #[test]
+    fn message_event_ext_text() {
+        // Original event.
+        let mut original_json = room_message_event(
+            &ORIGINAL_EVENT_ID,
+            json!({
+                "msgtype": "m.text",
+                "body": "hebbot: Hello fiend!",
+            }),
+        );
+
+        let event: OriginalSyncRoomMessageEvent =
+            serde_json::from_value(original_json.clone()).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Text(_));
+        assert_eq!(event.edited_event_id(), None);
+        assert_eq!(event.text(true), Some("hebbot: Hello fiend!"));
+        assert_eq!(event.text(false), Some("hebbot: Hello fiend!"));
+        assert_matches!(event.image(), None);
+        assert_matches!(event.video(), None);
+
+        // Edit.
+        let edit_json = room_message_event(
+            &EDIT_EVENT_ID,
+            json!({
+                "msgtype": "m.text",
+                "body": "*hebbot: Hello friend!",
+                "m.new_content": {
+                    "body": "hebbot: Hello friend!",
+                    "msgtype": "m.text",
+                },
+                "m.relates_to": {
+                    "rel_type": "m.replace",
+                    "event_id": *ORIGINAL_EVENT_ID,
+                },
+            }),
+        );
+
+        let event: OriginalSyncRoomMessageEvent =
+            serde_json::from_value(edit_json.clone()).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Text(_));
+        assert_eq!(event.edited_event_id(), Some(*ORIGINAL_EVENT_ID));
+        assert_eq!(event.text(true), Some("hebbot: Hello friend!"));
+        assert_eq!(event.text(false), Some("hebbot: Hello friend!"));
+        assert_matches!(event.image(), None);
+        assert_matches!(event.video(), None);
+
+        // Original event with aggregated edit.
+        insert_aggregated_edit(&mut original_json, edit_json);
+
+        let event: OriginalSyncRoomMessageEvent = serde_json::from_value(original_json).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Text(_));
+        assert_eq!(event.edited_event_id(), None);
+        assert_eq!(event.text(true), Some("hebbot: Hello friend!"));
+        assert_eq!(event.text(false), Some("hebbot: Hello friend!"));
+        assert_matches!(event.image(), None);
+        assert_matches!(event.video(), None);
+    }
+
+    #[test]
+    fn message_event_ext_notice() {
+        // Original event.
+        let mut original_json = room_message_event(
+            &ORIGINAL_EVENT_ID,
+            json!({
+                "msgtype": "m.notice",
+                "body": "hebbot: Hello fiend!",
+            }),
+        );
+
+        let event: OriginalSyncRoomMessageEvent =
+            serde_json::from_value(original_json.clone()).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Notice(_));
+        assert_eq!(event.edited_event_id(), None);
+        assert_eq!(event.text(true), Some("hebbot: Hello fiend!"));
+        assert_eq!(event.text(false), None);
+        assert_matches!(event.image(), None);
+        assert_matches!(event.video(), None);
+
+        // Edit.
+        let edit_json = room_message_event(
+            &EDIT_EVENT_ID,
+            json!({
+                "msgtype": "m.notice",
+                "body": "*hebbot: Hello friend!",
+                "m.new_content": {
+                    "body": "hebbot: Hello friend!",
+                    "msgtype": "m.notice",
+                },
+                "m.relates_to": {
+                    "rel_type": "m.replace",
+                    "event_id": *ORIGINAL_EVENT_ID,
+                },
+            }),
+        );
+
+        let event: OriginalSyncRoomMessageEvent =
+            serde_json::from_value(edit_json.clone()).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Notice(_));
+        assert_eq!(event.edited_event_id(), Some(*ORIGINAL_EVENT_ID));
+        assert_eq!(event.text(true), Some("hebbot: Hello friend!"));
+        assert_eq!(event.text(false), None);
+        assert_matches!(event.image(), None);
+        assert_matches!(event.video(), None);
+
+        // Original event with aggregated edit.
+        insert_aggregated_edit(&mut original_json, edit_json);
+
+        let event: OriginalSyncRoomMessageEvent = serde_json::from_value(original_json).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Notice(_));
+        assert_eq!(event.edited_event_id(), None);
+        assert_eq!(event.text(true), Some("hebbot: Hello friend!"));
+        assert_eq!(event.text(false), None);
+        assert_matches!(event.image(), None);
+        assert_matches!(event.video(), None);
+    }
+
+    #[test]
+    fn message_event_ext_image() {
+        // Original event.
+        let mut original_json = room_message_event(
+            &ORIGINAL_EVENT_ID,
+            json!({
+                "msgtype": "m.image",
+                "body": "original_image.png",
+                "url": "mxc://matrix.local/01234",
+            }),
+        );
+
+        let event: OriginalSyncRoomMessageEvent =
+            serde_json::from_value(original_json.clone()).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Image(_));
+        assert_eq!(event.edited_event_id(), None);
+        assert_eq!(event.text(true), None);
+        assert_eq!(event.text(false), None);
+        assert_matches!(event.image(), Some(image));
+        assert_eq!(image.body, "original_image.png");
+        assert_matches!(&image.source, MediaSource::Plain(uri));
+        assert_eq!(uri, "mxc://matrix.local/01234");
+        assert_matches!(event.video(), None);
+
+        // Edit.
+        let edit_json = room_message_event(
+            &EDIT_EVENT_ID,
+            json!({
+                "msgtype": "m.image",
+                "body": "*edited_image.png",
+                "url": "mxc://matrix.local/56789",
+                "m.new_content": {
+                    "msgtype": "m.image",
+                    "body": "edited_image.png",
+                    "url": "mxc://matrix.local/56789",
+                },
+                "m.relates_to": {
+                    "rel_type": "m.replace",
+                    "event_id": *ORIGINAL_EVENT_ID,
+                },
+            }),
+        );
+
+        let event: OriginalSyncRoomMessageEvent =
+            serde_json::from_value(edit_json.clone()).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Image(_));
+        assert_eq!(event.edited_event_id(), Some(*ORIGINAL_EVENT_ID));
+        assert_eq!(event.text(true), None);
+        assert_eq!(event.text(false), None);
+        assert_matches!(event.image(), Some(image));
+        assert_eq!(image.body, "edited_image.png");
+        assert_matches!(&image.source, MediaSource::Plain(uri));
+        assert_eq!(uri, "mxc://matrix.local/56789");
+        assert_matches!(event.video(), None);
+
+        // Original event with aggregated edit.
+        insert_aggregated_edit(&mut original_json, edit_json);
+
+        let event: OriginalSyncRoomMessageEvent = serde_json::from_value(original_json).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Image(_));
+        assert_eq!(event.edited_event_id(), None);
+        assert_eq!(event.text(true), None);
+        assert_eq!(event.text(false), None);
+        assert_matches!(event.image(), Some(image));
+        assert_eq!(image.body, "edited_image.png");
+        assert_matches!(&image.source, MediaSource::Plain(uri));
+        assert_eq!(uri, "mxc://matrix.local/56789");
+        assert_matches!(event.video(), None);
+    }
+
+    #[test]
+    fn message_event_ext_video() {
+        // Original event.
+        let mut original_json = room_message_event(
+            &ORIGINAL_EVENT_ID,
+            json!({
+                "msgtype": "m.video",
+                "body": "original_video.webm",
+                "url": "mxc://matrix.local/01234",
+            }),
+        );
+
+        let event: OriginalSyncRoomMessageEvent =
+            serde_json::from_value(original_json.clone()).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Video(_));
+        assert_eq!(event.edited_event_id(), None);
+        assert_eq!(event.text(true), None);
+        assert_eq!(event.text(false), None);
+        assert_matches!(event.image(), None);
+        assert_matches!(event.video(), Some(video));
+        assert_eq!(video.body, "original_video.webm");
+        assert_matches!(&video.source, MediaSource::Plain(uri));
+        assert_eq!(uri, "mxc://matrix.local/01234");
+
+        // Edit.
+        let edit_json = room_message_event(
+            &EDIT_EVENT_ID,
+            json!({
+                "msgtype": "m.video",
+                "body": "*edited_video.webm",
+                "url": "mxc://matrix.local/56789",
+                "m.new_content": {
+                    "msgtype": "m.video",
+                    "body": "edited_video.webm",
+                    "url": "mxc://matrix.local/56789",
+                },
+                "m.relates_to": {
+                    "rel_type": "m.replace",
+                    "event_id": *ORIGINAL_EVENT_ID,
+                },
+            }),
+        );
+
+        let event: OriginalSyncRoomMessageEvent =
+            serde_json::from_value(edit_json.clone()).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Video(_));
+        assert_eq!(event.edited_event_id(), Some(*ORIGINAL_EVENT_ID));
+        assert_eq!(event.text(true), None);
+        assert_eq!(event.text(false), None);
+        assert_matches!(event.image(), None);
+        assert_matches!(event.video(), Some(video));
+        assert_eq!(video.body, "edited_video.webm");
+        assert_matches!(&video.source, MediaSource::Plain(uri));
+        assert_eq!(uri, "mxc://matrix.local/56789");
+
+        // Original event with aggregated edit.
+        insert_aggregated_edit(&mut original_json, edit_json);
+
+        let event: OriginalSyncRoomMessageEvent = serde_json::from_value(original_json).unwrap();
+        assert_matches!(event.msgtype(), MessageType::Video(_));
+        assert_eq!(event.edited_event_id(), None);
+        assert_eq!(event.text(true), None);
+        assert_eq!(event.text(false), None);
+        assert_matches!(event.image(), None);
+        assert_matches!(event.video(), Some(video));
+        assert_eq!(video.body, "edited_video.webm");
+        assert_matches!(&video.source, MediaSource::Plain(uri));
+        assert_eq!(uri, "mxc://matrix.local/56789");
+    }
+
+    #[test]
+    fn msg_starts_with_mention_and_remove_bot_name() {
+        let lowercase_user_id = user_id!("@hebbot:matrix.local");
+        let uppercase_user_id = <&UserId>::try_from("@HEBBOT:matrix.local").unwrap();
+        let lowercase_display_name = "the hebbot".to_owned();
+        let uppercase_display_name = "THE HEBBOT".to_owned();
+
+        let content = "This is my entry";
+
+        let matching_localpart_prefixes = &[
+            "hebbot: ",
+            "@hebbot: ",
+            "HEBBOT: ",
+            "hebbot ",
+            "@hebbot ",
+            "HEBBOT ",
+        ];
+
+        for prefix in matching_localpart_prefixes {
+            let message = format!("{prefix}{content}");
+
+            // Log the message for debugging when the check fails.
+            println!("Checking message: `{message}`");
+
+            // Lowercase user ID and display name.
+            assert!(msg_starts_with_mention(
+                lowercase_user_id,
+                Some(lowercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    lowercase_user_id,
+                    Some(lowercase_display_name.clone()),
+                    &message,
+                ),
+                content
+            );
+
+            // Lowercase user ID no display name.
+            assert!(msg_starts_with_mention(lowercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(lowercase_user_id, None, &message), content);
+
+            // Uppercase user ID and display name.
+            assert!(msg_starts_with_mention(
+                uppercase_user_id,
+                Some(uppercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    uppercase_user_id,
+                    Some(uppercase_display_name.clone()),
+                    &message,
+                ),
+                content
+            );
+
+            // Uppercase user ID no display name.
+            assert!(msg_starts_with_mention(uppercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(uppercase_user_id, None, &message), content);
+        }
+
+        let matching_display_name_prefixes =
+            &["the hebbot: ", "THE HEBBOT: ", "the hebbot ", "THE HEBBOT "];
+
+        for prefix in matching_display_name_prefixes {
+            let message = format!("{prefix}{content}");
+
+            // Log the message for debugging when the check fails.
+            println!("Checking message: `{message}`");
+
+            // Lowercase user ID and display name.
+            assert!(msg_starts_with_mention(
+                lowercase_user_id,
+                Some(lowercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    lowercase_user_id,
+                    Some(lowercase_display_name.clone()),
+                    &message,
+                ),
+                content
+            );
+
+            // Lowercase user ID no display name.
+            assert!(!msg_starts_with_mention(lowercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(lowercase_user_id, None, &message), message);
+
+            // Uppercase user ID and display name.
+            assert!(msg_starts_with_mention(
+                uppercase_user_id,
+                Some(uppercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    uppercase_user_id,
+                    Some(uppercase_display_name.clone()),
+                    &message,
+                ),
+                content
+            );
+
+            // Uppercase user ID no display name.
+            assert!(!msg_starts_with_mention(uppercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(uppercase_user_id, None, &message), message);
+        }
+
+        let not_matching_prefixes = &[
+            "[hebbot] ",
+            "[@hebbot] ",
+            "[HEBBOT] ",
+            "[the hebbot] ",
+            "[THE HEBBOT] ",
+            "heb bot ",
+            "@the hebbot",
+        ];
+
+        for prefix in not_matching_prefixes {
+            let message = format!("{prefix}{content}");
+
+            // Log the message for debugging when the check fails.
+            println!("Checking message: `{message}`");
+
+            // Lowercase user ID and display name.
+            assert!(!msg_starts_with_mention(
+                lowercase_user_id,
+                Some(lowercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    lowercase_user_id,
+                    Some(lowercase_display_name.clone()),
+                    &message,
+                ),
+                message
+            );
+
+            // Lowercase user ID no display name.
+            assert!(!msg_starts_with_mention(lowercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(lowercase_user_id, None, &message), message);
+
+            // Uppercase user ID and display name.
+            assert!(!msg_starts_with_mention(
+                uppercase_user_id,
+                Some(uppercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    uppercase_user_id,
+                    Some(uppercase_display_name.clone()),
+                    &message,
+                ),
+                message
+            );
+
+            // Uppercase user ID no display name.
+            assert!(!msg_starts_with_mention(uppercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(uppercase_user_id, None, &message), message);
+        }
+    }
+}

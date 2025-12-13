@@ -22,6 +22,9 @@ minijinja = { version = "2.0.1", features = ["builtins", "debug", "deserializati
 minijinja-contrib = { version = "2.0.1", features = ["datetime", "rand"] }
 time = "0.3.36"
 
+[dev-dependencies]
+assert_matches2 = "0.1.2"
+
 [features]
 default = [
 	"matrix-sdk/default",

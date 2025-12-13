@@ -3,11 +3,11 @@ on:
     branches: [master]
   pull_request:
 
-name: build
+name: test
 
 jobs:
-  check:
-    name: check
+  test:
+    name: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,5 +18,4 @@ jobs:
       - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.2
         name: Cargo build
         with:
-          command: cargo check
-          args: --all-targets
+          command: cargo test

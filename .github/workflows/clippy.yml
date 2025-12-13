@@ -18,6 +18,5 @@ jobs:
       - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.2
         with:
           command: cargo clippy
-          args: -- -D warnings
+          args: --all-targets -- -D warnings
           annotations: true
-
