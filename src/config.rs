@@ -1,5 +1,4 @@
 use matrix_sdk::ruma::{OwnedUserId, UserId};
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use std::collections::HashSet;
@@ -83,12 +82,6 @@ impl Config {
         }
 
         sections_for_this_reporter
-    }
-
-    pub fn random_verb(&self) -> String {
-        let mut rng = rand::rng();
-        let id = rng.random_range(0..self.verbs.len());
-        self.verbs[id].to_string()
     }
 
     fn validate_config(config: Self) -> ConfigResult {

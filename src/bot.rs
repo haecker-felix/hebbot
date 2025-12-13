@@ -155,12 +155,8 @@ impl Bot {
         #[rustfmt::skip]
         let (room, content) = match msg_type{
             BotMsgType::AdminRoomHtmlNotice => (&self.admin_room, RoomMessageEventContent::notice_html(msg, msg)),
-            BotMsgType::AdminRoomHtmlText => (&self.admin_room, RoomMessageEventContent::text_html(msg, msg)),
-            BotMsgType::AdminRoomPlainText => (&self.admin_room, RoomMessageEventContent::text_plain(msg)),
             BotMsgType::AdminRoomPlainNotice => (&self.admin_room, RoomMessageEventContent::notice_plain(msg)),
-            BotMsgType::ReportingRoomHtmlText => (&self.reporting_room, RoomMessageEventContent::text_html(msg, msg)),
             BotMsgType::ReportingRoomPlainText => (&self.reporting_room, RoomMessageEventContent::text_plain(msg)),
-            BotMsgType::ReportingRoomHtmlNotice => (&self.reporting_room, RoomMessageEventContent::notice_html(msg, msg)),
             BotMsgType::ReportingRoomPlainNotice => (&self.reporting_room, RoomMessageEventContent::notice_plain(msg)),
         };
 

@@ -134,6 +134,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9dbc3a507a82b17ba0d98f6ce8fd6954ea0c8152e98009d36a40d8dcc8ce078a"
 
 [[package]]
+name = "assert_matches2"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15832d94c458da98cac0ffa6eca52cc19c2a3c6c951058500a5ae8f01f0fdf56"
+
+[[package]]
 name = "assign"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1314,6 +1320,7 @@ dependencies = [
 name = "hebbot"
 version = "2.1.0"
 dependencies = [
+ "assert_matches2",
  "async-process",
  "chrono",
  "log",
@@ -1322,7 +1329,6 @@ dependencies = [
  "minijinja",
  "minijinja-contrib",
  "pretty_env_logger",
- "rand 0.9.2",
  "regex",
  "serde",
  "serde_json",

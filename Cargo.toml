@@ -14,13 +14,15 @@ log = "0.4"
 pretty_env_logger = "0.5"
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1.5"
-rand = "0.9"
 mime = "0.3"
 toml = "0.9"
 async-process = "2.2"
 minijinja = { version = "2.0.1", features = ["builtins", "debug", "deserialization", "json", "std_collections"] }
 minijinja-contrib = { version = "2.0.1", features = ["datetime", "rand"] }
 time = "0.3.36"
+
+[dev-dependencies]
+assert_matches2 = "0.1.2"
 
 [features]
 default = [
