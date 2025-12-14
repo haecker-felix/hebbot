@@ -14,7 +14,31 @@ use regex::Regex;
 use std::fmt::Write;
 use std::fs::File;
 use std::io::Read;
+use std::sync::{LazyLock, Mutex, OnceLock};
 use std::{env, str};
+
+/// The cached regex that matches the user ID of the bot as a mention at the start of a string.
+static USER_ID_MENTION_REGEX: LazyLock<OnceLock<Regex>> = LazyLock::new(OnceLock::new);
+
+/// The cached regex that matches the display name of the bot as a mention at the start of a string.
+static DISPLAY_NAME_MENTION_REGEX: LazyLock<Mutex<Option<CachedRegex>>> =
+    LazyLock::new(Mutex::default);
+
+/// A regex with a validity asserted by a key.
+struct CachedRegex {
+    /// The key to verify that the regex is still valid.
+    key: String,
+
+    /// The regex.
+    regex: Regex,
+}
+
+impl CachedRegex {
+    /// Get the inner regex if the key is valid.
+    fn regex(&self, key: &str) -> Option<&Regex> {
+        (self.key == key).then_some(&self.regex)
+    }
+}
 
 /// Helper trait for room message events.
 ///
@@ -147,18 +171,76 @@ pub fn emoji_cmp(a: &str, b: &str) -> bool {
     a == b
 }
 
-/// Remove bot name from message
-pub fn remove_bot_name(bot: &UserId, display_name: Option<String>, msg: &str) -> String {
-    // remove user id
-    let regex = format!("(?i)^@?{}(:{})?:?", bot.localpart(), bot.server_name());
-    let re = Regex::new(&regex).unwrap();
-    let mut msg = re.replace(msg, "").to_string();
+/// The cached regex that matches the user ID of the bot as a mention at the start of a string.
+///
+/// The mention:
+///
+/// - Is case-insensitive.
+/// - May start with `@`.
+/// - May include the server name.
+/// - May be followed by `:`.
+fn user_id_mention_regex(user_id: &UserId) -> &'static Regex {
+    // The bot's user ID will never change as long as the bot is running, so we compile it only
+    // the first time and store it in a `OnceLock`.
+    USER_ID_MENTION_REGEX.get_or_init(|| {
+        let escaped_localpart = regex::escape(user_id.localpart());
+        let escaped_server_name = regex::escape(user_id.server_name().as_str());
 
-    // remove display name
+        Regex::new(&format!(
+            "(?i)^@?{escaped_localpart}(:{escaped_server_name})?:?"
+        ))
+        .unwrap()
+    })
+}
+
+/// The cached regex that matches the user ID of the bot as a mention at the start of a string.
+///
+/// The mention:
+///
+/// - Is case-insensitive.
+/// - May be followed by `:`.
+fn display_name_mention_regex(display_name: Option<String>) -> Option<Regex> {
+    // The bot's display name might change when the bot is running, so we store it in a `Mutex`
+    // and replace it when it is invalidated.
+    let mut cached_regex = DISPLAY_NAME_MENTION_REGEX
+        .lock()
+        .expect("the lock should never be poisoned");
+
     if let Some(display_name) = display_name {
-        let regex = format!("(?i)^{}:?", display_name);
-        let re = Regex::new(&regex).unwrap();
-        msg = re.replace(&msg, "").to_string();
+        if let Some(regex) = cached_regex
+            .as_ref()
+            .and_then(|cached_regex| cached_regex.regex(&display_name))
+        {
+            // We have a regex and it is still valid, return it.
+            return Some(regex.clone());
+        } else {
+            // We don't have a regex or it is invalid, compile a new regex.
+            let escaped_display_name = regex::escape(&display_name);
+            let regex = Regex::new(&format!("(?i)^{escaped_display_name}:?")).unwrap();
+
+            *cached_regex = Some(CachedRegex {
+                key: display_name,
+                regex: regex.clone(),
+            });
+
+            return Some(regex);
+        }
+    } else if cached_regex.is_some() {
+        // The display name was removed, drop the regex.
+        cached_regex.take();
+    }
+
+    None
+}
+
+/// Remove bot name from message
+pub fn remove_bot_name(user_id: &UserId, display_name: Option<String>, msg: &str) -> String {
+    // Remove user ID.
+    let mut msg = user_id_mention_regex(user_id).replace(msg, "").to_string();
+
+    // Remove display name.
+    if let Some(display_name_mention_regex) = display_name_mention_regex(display_name) {
+        msg = display_name_mention_regex.replace(&msg, "").to_string();
     }
 
     msg.trim().to_string()
