@@ -146,22 +146,28 @@ pub fn as_message_event(
     }
 }
 
-/// Checks if a message starts with a user_id mention
-/// Automatically handles @ in front of the name
+/// Checks if a message starts with a user ID or display name mention.
+///
+/// The mention:
+///
+/// - Is case-insensitive.
+/// - May be followed by `:`.
+///
+/// And for the user ID:
+///
+/// - May start with `@`.
+/// - May include the server name.
 pub fn msg_starts_with_mention(user_id: &UserId, display_name: Option<String>, msg: &str) -> bool {
-    let localpart = user_id.localpart().to_lowercase();
-    // Catch "@botname ..." messages
-    let msg = msg.replace(&format!("@{}", localpart), &localpart);
-    let msg = msg.as_str().to_lowercase();
+    // Catch messages that start with the user ID.
+    if user_id_mention_regex(user_id).is_match(msg) {
+        return true;
+    }
 
-    let matches_localpart = msg.starts_with(&localpart);
-    let matches_display_name = if let Some(display_name) = display_name {
-        msg.starts_with(&display_name.to_lowercase())
-    } else {
-        false
-    };
+    if let Some(display_name_mention_regex) = display_name_mention_regex(display_name) {
+        return display_name_mention_regex.is_match(msg);
+    }
 
-    matches_localpart || matches_display_name
+    false
 }
 
 /// Returns `true` if the emojis are matching
@@ -612,6 +618,9 @@ mod tests {
             "hebbot ",
             "@hebbot ",
             "HEBBOT ",
+            "@HEBBOT ",
+            "@hebbot:matrix.local ",
+            "@HEBBOT:matrix.local ",
         ];
 
         for prefix in matching_localpart_prefixes {
@@ -759,6 +768,58 @@ mod tests {
 
             // Uppercase user ID no display name.
             assert!(!msg_starts_with_mention(uppercase_user_id, None, &message,));
+            assert_eq!(remove_bot_name(uppercase_user_id, None, &message), message);
+        }
+
+        // Try with matching prefixes as suffixes, which should fail.
+        for suffix in matching_localpart_prefixes
+            .iter()
+            .chain(matching_display_name_prefixes)
+            .copied()
+            // We need to trim whitespaces because they are trimmed in `remove_bot_name`.
+            .map(str::trim)
+        {
+            let message = format!("{content} {suffix}");
+
+            // Log the message for debugging when the check fails.
+            println!("Checking message: `{message}`");
+
+            // Lowercase user ID and display name.
+            assert!(!msg_starts_with_mention(
+                lowercase_user_id,
+                Some(lowercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    lowercase_user_id,
+                    Some(lowercase_display_name.clone()),
+                    &message,
+                ),
+                message
+            );
+
+            // Lowercase user ID no display name.
+            assert!(!msg_starts_with_mention(lowercase_user_id, None, &message));
+            assert_eq!(remove_bot_name(lowercase_user_id, None, &message), message);
+
+            // Uppercase user ID and display name.
+            assert!(!msg_starts_with_mention(
+                uppercase_user_id,
+                Some(uppercase_display_name.clone()),
+                &message
+            ));
+            assert_eq!(
+                remove_bot_name(
+                    uppercase_user_id,
+                    Some(uppercase_display_name.clone()),
+                    &message,
+                ),
+                message
+            );
+
+            // Uppercase user ID no display name.
+            assert!(!msg_starts_with_mention(uppercase_user_id, None, &message));
             assert_eq!(remove_bot_name(uppercase_user_id, None, &message), message);
         }
     }
