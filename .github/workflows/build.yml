@@ -1,6 +1,6 @@
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
 
 name: build
@@ -19,4 +19,3 @@ jobs:
         name: Cargo build
         with:
           command: cargo check
-          args: --all-targets

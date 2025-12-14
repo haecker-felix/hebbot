@@ -23,7 +23,7 @@ The bot was inspired by [twim-o-matic](https://github.com/matrix-org/twim-o-mati
 ### Documentation
 Check out documentation for...
 - latest [stable release v2.1](https://github.com/haecker-felix/hebbot/tree/e1f43fbadf2bd284d78c270c0fe8ef231c8a7978/doc)
-- unstable [development builds](https://github.com/haecker-felix/hebbot/tree/master/doc)
+- unstable [development builds](https://github.com/haecker-felix/hebbot/tree/main/doc)
 
 ### Example Usage
 - [This Week in GNOME](https://gitlab.gnome.org/World/twig) ([configuration](https://gitlab.gnome.org/World/twig/-/tree/main/hebbot))
