@@ -1,5 +1,4 @@
 use matrix_sdk::ruma::{OwnedUserId, UserId};
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use std::collections::HashSet;
@@ -85,50 +84,35 @@ impl Config {
         sections_for_this_reporter
     }
 
-    pub fn random_verb(&self) -> String {
-        let mut rng = rand::rng();
-        let id = rng.random_range(0..self.verbs.len());
-        self.verbs[id].to_string()
-    }
-
     fn validate_config(config: Self) -> ConfigResult {
         let mut warnings = Vec::new();
         let mut notes = Vec::new();
 
         // Check if something is missing / empty
         if config.notice_emoji.is_empty() {
-            warnings.insert(
-                0,
+            warnings.push(
                 "At least one emoji isn’t configured. The bot will not work properly.".to_string(),
             );
         }
 
         if config.editors.is_empty() {
-            warnings.insert(
-                0,
+            warnings.push(
                 "No editor is specified, the bot cannot be used without an editor".to_string(),
             );
         }
 
         if config.sections.is_empty() {
-            notes.insert(
-                0,
-                "No sections are configured in the configuration file.".to_string(),
-            );
+            notes.push("No sections are configured in the configuration file.".to_string());
         }
 
         if config.projects.is_empty() {
-            warnings.insert(
-                0,
-                "No projects are configured in the configuration file.".to_string(),
-            );
+            warnings.push("No projects are configured in the configuration file.".to_string());
         }
 
         let mut section_names = Vec::new();
         for section in &config.sections {
             if section.name.is_empty() {
-                warnings.insert(
-                    0,
+                warnings.push(
                     "Section without name found, this can lead to undefined behavior.".to_string(),
                 );
                 continue;
@@ -137,37 +121,29 @@ impl Config {
             section_names.insert(0, section.name.clone());
 
             if section.emoji.is_empty() {
-                warnings.insert(
-                    0,
-                    format!(
-                        "Section “{}” doesn’t have an emoji, this can lead to undefined behavior.",
-                        section.name
-                    ),
-                );
+                warnings.push(format!(
+                    "Section “{}” doesn’t have an emoji, this can lead to undefined behavior.",
+                    section.name
+                ));
             }
         }
 
         for project in &config.projects {
             if project.name.is_empty() {
-                warnings.insert(
-                    0,
+                warnings.push(
                     "Project without name found, this can lead to undefined behavior.".to_string(),
                 );
                 continue;
             }
 
             if project.emoji.is_empty() {
-                warnings.insert(
-                    0,
-                    format!(
-                        "Project “{}” doesn’t have an emoji, this can lead to undefined behavior.",
-                        project.name
-                    ),
-                );
+                warnings.push(format!(
+                    "Project “{}” doesn’t have an emoji, this can lead to undefined behavior.",
+                    project.name
+                ));
             }
             if project.default_section.is_empty() {
-                warnings.insert(
-                    0,
+                warnings.push(
                     format!(
                         "Project “{}” doesn’t have a default section, this can lead to undefined behavior.",
                         project.name
@@ -177,8 +153,7 @@ impl Config {
             }
 
             if !section_names.contains(&project.default_section) {
-                warnings.insert(
-                    0,
+                warnings.push(
                     format!(
                         "Project “{}” has an unknown default section “{}”, this can lead to undefined behavior.",
                         project.name,
@@ -215,22 +190,16 @@ impl Config {
         name_duplicates.dedup();
 
         if !emoji_duplicates.is_empty() {
-            warnings.insert(
-                0,
-                format!(
-                    "At least one emoji is duplicated, this can lead to undefined behavior: {:?} ",
-                    emoji_duplicates
-                ),
-            );
+            warnings.push(format!(
+                "At least one emoji is duplicated, this can lead to undefined behavior: {:?} ",
+                emoji_duplicates
+            ));
         }
         if !name_duplicates.is_empty() {
-            warnings.insert(
-                0,
-                format!(
-                    "At least one name is duplicated, this can lead to undefined behavior: {:?} ",
-                    name_duplicates
-                ),
-            );
+            warnings.push(format!(
+                "At least one name is duplicated, this can lead to undefined behavior: {:?} ",
+                name_duplicates
+            ));
         }
 
         ConfigResult {
