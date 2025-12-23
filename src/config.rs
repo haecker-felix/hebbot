@@ -17,6 +17,7 @@ pub struct Config {
     pub min_length: usize,
     pub ack_text: String,
     pub update_config_command: String,
+    pub publish_command: Option<String>,
     pub editors: Vec<OwnedUserId>,
     pub sections: Vec<Section>,
     pub projects: Vec<Project>,
