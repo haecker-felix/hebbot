@@ -1018,7 +1018,7 @@ impl Bot {
             self.news_store.lock().unwrap().add_news(news);
         } else {
             let msg = format!(
-                "❌ {}: Your update is too short and was not stored. This limitation was set-up to limit spam.",
+                "❌ {}: Your update is too short and was not stored. This limitation was set up to limit spam.",
                 news.reporter_display_name
             );
             self.send_message(&msg, BotMsgType::ReportingRoomPlainNotice)
