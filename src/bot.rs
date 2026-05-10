@@ -3,14 +3,14 @@ use chrono::{DateTime, Utc};
 use matrix_sdk::config::{RequestConfig, SyncSettings};
 use matrix_sdk::event_handler::Ctx;
 use matrix_sdk::room::RoomMember;
+use matrix_sdk::ruma::events::Mentions;
 use matrix_sdk::ruma::events::reaction::{OriginalSyncReactionEvent, ReactionEventContent};
 use matrix_sdk::ruma::events::relation::Annotation;
+use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::room::message::{
     FileMessageEventContent, MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent,
 };
 use matrix_sdk::ruma::events::room::redaction::SyncRoomRedactionEvent;
-use matrix_sdk::ruma::events::room::MediaSource;
-use matrix_sdk::ruma::events::Mentions;
 use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, ServerName, UserId};
 use matrix_sdk::{Client, Room, RoomState};
 
@@ -23,7 +23,7 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 
 use crate::utils::MessageEventExt;
-use crate::{render, utils, BotMessageType as BotMsgType, Config, News, NewsStore, ReactionType};
+use crate::{BotMessageType as BotMsgType, Config, News, NewsStore, ReactionType, render, utils};
 
 #[derive(Clone)]
 pub struct Bot {
@@ -335,8 +335,7 @@ impl Bot {
                 if news.is_assigned() {
                     Some(format!(
                         "✅ The news entry by {} got edited. Check the new text, and make sure you want to keep the assigned project/section. [{}]",
-                        news.reporter_id,
-                        link
+                        news.reporter_id, link
                     ))
                 } else {
                     None
@@ -459,12 +458,12 @@ impl Bot {
                     }
                 } else {
                     Some(format!(
-                            "⚠️ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
-                            reaction_sender.user_id(),
-                            reaction_type,
-                            link,
-                            related_event_id
-                        ))
+                        "⚠️ Unable to process {}’s {} reaction, message doesn’t exist or isn’t a news submission [{}]\n(ID {})",
+                        reaction_sender.user_id(),
+                        reaction_type,
+                        link,
+                        related_event_id
+                    ))
                 }
             }
             // Check if related message is an image

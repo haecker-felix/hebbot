@@ -219,13 +219,13 @@ mod tests {
     use std::sync::LazyLock;
 
     use assert_matches2::assert_matches;
-    use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
     use matrix_sdk::ruma::events::room::MediaSource;
+    use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
     use matrix_sdk::ruma::serde::JsonObject;
-    use matrix_sdk::ruma::{event_id, user_id, EventId, UserId};
+    use matrix_sdk::ruma::{EventId, UserId, event_id, user_id};
     use serde_json::json;
 
-    use super::{msg_starts_with_mention, remove_bot_name, MessageEventExt};
+    use super::{MessageEventExt, msg_starts_with_mention, remove_bot_name};
 
     static ORIGINAL_EVENT_ID: LazyLock<&'static EventId> = LazyLock::new(|| event_id!("$original"));
     static EDIT_EVENT_ID: LazyLock<&'static EventId> = LazyLock::new(|| event_id!("$edit"));

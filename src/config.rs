@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::HashSet;
 
-use crate::{utils, Project, ReactionType, Section};
+use crate::{Project, ReactionType, Section, utils};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Config {
