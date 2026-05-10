@@ -8,7 +8,7 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
 env:
-  GHCR_IMAGE: ghcr.io/HarHarLinks/hebbot
+  GHCR_IMAGE: ghcr.io/haecker-felix/hebbot
 
 jobs:
   build-push:
