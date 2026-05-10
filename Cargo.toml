@@ -2,7 +2,7 @@
 name = "hebbot"
 version = "2.1.0"
 authors = ["Felix Häcker <haeckerfelix@gnome.org>"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 matrix-sdk = { version = "0.14", default-features = false }
