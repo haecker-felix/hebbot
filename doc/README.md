@@ -38,5 +38,5 @@ More configuration examples:
 - [This Week in GNOME](https://gitlab.gnome.org/World/twig/-/tree/main/hebbot)
 
 ### Deployment
-The bot is available as [docker image](https://hub.docker.com/r/haeckerfelix/hebbot).
+The bot is available as [docker image](https://github.com/haecker-felix/hebbot/pkgs/container/hebbot).
 You can find an example `docker-compose.yml` inside the `example_config` folder. Be sure to set the `BOT_PASSWORD` variable correctly before using it.
