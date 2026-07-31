@@ -312,7 +312,7 @@ impl Bot {
 
         // Create new news entry...
         let news = News::new(event_id.to_owned(), member, message.to_owned());
-        self.add_news(news, true).await;
+        self.add_news(news, true, false).await;
     }
 
     /// New message in reporting room
@@ -420,7 +420,7 @@ impl Bot {
                         &related_event_sender,
                         text.to_owned(),
                     );
-                    self.add_news(news, false).await;
+                    self.add_news(news, false, sender_is_editor).await;
                     None
                 }
                 // Check if related message is a news entry
@@ -948,7 +948,7 @@ impl Bot {
             .await;
     }
 
-    async fn add_news(&self, news: News, notify_reporter: bool) {
+    async fn add_news(&self, news: News, notify_reporter: bool, editor_override: bool) {
         let link = self.message_link(&news.event_id);
 
         // Check if the news already exists
@@ -977,8 +977,8 @@ impl Bot {
             &news.message(),
         ));
 
-        // Check min message length
-        if news.message().len() > self.config.min_length {
+        // Editors can bypass the min_length spam filter by reacting with the notice emoji
+        if news.message().len() > self.config.min_length || editor_override {
             if notify_reporter && !self.config.ack_text.is_empty() {
                 let msg = &self
                     .config
