@@ -849,11 +849,11 @@ impl Bot {
             )
             .await;
 
-            let mut curl_command = "curl".to_string();
+            let mut curl_command = "curl -H 'Authorization: Bearer <access token>'".to_string();
             for (filename, uri) in &files {
                 if uri.is_valid() {
                     let url = format!(
-                        "{}_matrix/media/r0/download/{}/{}",
+                        "{}_matrix/client/v1/media/download/{}/{}",
                         self.client.homeserver(),
                         uri.server_name().unwrap(),
                         uri.media_id().unwrap()
