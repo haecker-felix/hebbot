@@ -395,9 +395,7 @@ impl Bot {
                     reaction_emoji
                 );
                 return;
-            }
-
-            if let Some(text) = related_event.text(true) {
+            } else if let Some(text) = related_event.text(true) {
                 // Check if the reaction == notice emoji,
                 // Yes -> Try to add the message as news submission
                 if utils::emoji_cmp(reaction_emoji, &self.config.notice_emoji) {
@@ -472,10 +470,19 @@ impl Bot {
                     ReactionType::Notice => {
                         let reporter_id = reaction_sender.user_id();
                         let news_store = self.news_store.lock().unwrap();
-                        if let Some(news) = news_store.find_related_news(
-                            related_event.sender.as_ref(),
-                            &related_event_timestamp,
-                        ) {
+                        // If the image was sent as a reply to the submitter's message
+                        // (eg. by an editor uploading on their behalf), that's an
+                        // unambiguous match — prefer it over the sender/timestamp guess.
+                        if let Some(news) = related_event
+                            .in_reply_to()
+                            .and_then(|id| news_store.news_by_message_id(id))
+                            .or_else(|| {
+                                news_store.find_related_news(
+                                    related_event.sender.as_ref(),
+                                    &related_event_timestamp,
+                                )
+                            })
+                        {
                             if !sender_is_editor
                                 && (reaction_sender.user_id() != related_event.sender
                                     && self.config.restrict_notice)
@@ -496,7 +503,7 @@ impl Bot {
                                     link
                                 ))
                             } else {
-                                None
+                                Some(format!("❌ Unable to link encrypted media [{}].", link))
                             }
                         } else {
                             Some(format!(
@@ -505,6 +512,14 @@ impl Bot {
                             ))
                         }
                     }
+                    ReactionType::PostRef(post_id) => Some(self.link_media_by_post_ref(
+                        sender_is_editor,
+                        related_event,
+                        reaction_event_id,
+                        related_event_id,
+                        post_id,
+                        &link,
+                    )),
                     _ => Some(format!(
                         "❌ Invalid reaction emoji {} by {} for message type image [{}].",
                         reaction_emoji,
@@ -519,10 +534,22 @@ impl Bot {
                     ReactionType::Notice => {
                         let reporter_id = reaction_sender.user_id();
                         let news_store = self.news_store.lock().unwrap();
-                        if let Some(news) = news_store.find_related_news(
-                            related_event.sender.as_ref(),
-                            &related_event_timestamp,
-                        ) {
+                        if let Some(news) = related_event
+                            .in_reply_to()
+                            .and_then(|id| news_store.news_by_message_id(id))
+                            .or_else(|| {
+                                news_store.find_related_news(
+                                    related_event.sender.as_ref(),
+                                    &related_event_timestamp,
+                                )
+                            })
+                        {
+                            if !sender_is_editor
+                                && (reaction_sender.user_id() != related_event.sender
+                                    && self.config.restrict_notice)
+                            {
+                                return;
+                            }
                             if let MediaSource::Plain(mxc_uri) = &video.source {
                                 news.add_video(
                                     reaction_event_id.to_owned(),
@@ -537,7 +564,7 @@ impl Bot {
                                     link
                                 ))
                             } else {
-                                None
+                                Some(format!("❌ Unable to link encrypted media [{}].", link))
                             }
                         } else {
                             Some(format!(
@@ -546,6 +573,14 @@ impl Bot {
                             ))
                         }
                     }
+                    ReactionType::PostRef(post_id) => Some(self.link_media_by_post_ref(
+                        sender_is_editor,
+                        related_event,
+                        reaction_event_id,
+                        related_event_id,
+                        post_id,
+                        &link,
+                    )),
                     _ => Some(format!(
                         "❌ Invalid reaction emoji by {} for message type video [{}].",
                         reaction_sender.user_id(),
@@ -571,6 +606,73 @@ impl Bot {
         // Update stored news
         let news_store = self.news_store.lock().unwrap();
         news_store.write_data();
+    }
+
+    /// Links an image/video to a news entry referenced by its short `post_<id>`.
+    /// Editor-only, since it bypasses the usual reply/sender-matching checks.
+    fn link_media_by_post_ref(
+        &self,
+        sender_is_editor: bool,
+        related_event: &OriginalSyncRoomMessageEvent,
+        reaction_event_id: &EventId,
+        related_event_id: &EventId,
+        post_id: u32,
+        link: &str,
+    ) -> String {
+        if !sender_is_editor {
+            return format!(
+                "❌ Only editors can link media using a post_<id> reaction [{}].",
+                link
+            );
+        }
+
+        let media = related_event
+            .image()
+            .map(|i| (true, &i.source, i.body.clone()))
+            .or_else(|| {
+                related_event
+                    .video()
+                    .map(|v| (false, &v.source, v.body.clone()))
+            });
+
+        let Some((is_image, source, filename)) = media else {
+            return format!(
+                "❌ post_{} reaction ignored, related message isn’t an image/video [{}].",
+                post_id, link
+            );
+        };
+
+        let MediaSource::Plain(mxc_uri) = source else {
+            return format!("❌ Unable to link encrypted media [{}].", link);
+        };
+
+        let news_store = self.news_store.lock().unwrap();
+        let Some(news) = news_store.news_by_numeric_id(post_id) else {
+            return format!("❌ No news entry found for post_{} [{}].", post_id, link);
+        };
+
+        if is_image {
+            news.add_image(
+                reaction_event_id.to_owned(),
+                related_event_id.to_owned(),
+                filename,
+                mxc_uri.clone(),
+            );
+        } else {
+            news.add_video(
+                reaction_event_id.to_owned(),
+                related_event_id.to_owned(),
+                filename,
+                mxc_uri.clone(),
+            );
+        }
+
+        format!(
+            "✅ Added media to post_{}’s news entry (“{}”) [{}].",
+            post_id,
+            news.message_summary(),
+            link
+        )
     }
 
     /// Something got redacted in reporting room
@@ -742,6 +844,9 @@ impl Bot {
                 ReactionType::Project(project) => project.unwrap().html_details(),
                 ReactionType::None => format!("❌ Unable to find details for ”{}”.", term),
                 ReactionType::Notice => format!("{} is configured as notice emoji", term),
+                ReactionType::PostRef(id) => {
+                    format!("post_{} links media to the news entry with that id", id)
+                }
             }
         };
 
@@ -894,16 +999,22 @@ impl Bot {
                     assigned_count += 1;
                     write!(
                         assigned_list,
-                        "- [{}] {}: {} <br>",
-                        link, n.reporter_id, summary
+                        "- post_{} [{}] {}: {} <br>",
+                        n.id(),
+                        link,
+                        n.reporter_id,
+                        summary
                     )
                     .unwrap();
                 } else {
                     unassigned_count += 1;
                     write!(
                         unassigned_list,
-                        "- [{}] {}: {} <br>",
-                        link, n.reporter_id, summary
+                        "- post_{} [{}] {}: {} <br>",
+                        n.id(),
+                        link,
+                        n.reporter_id,
+                        summary
                     )
                     .unwrap();
                 }
@@ -988,7 +1099,18 @@ impl Bot {
                     .await;
             }
 
-            let msg = format!("✅ {} submitted a news entry. [{}]", news.reporter_id, link);
+            // Capture what we still need before moving `news` into the store.
+            let event_id = news.event_id.clone();
+            let reporter_id = news.reporter_id.clone();
+            let message = news.message();
+
+            // Save it in message store (assigns its post_<id>)
+            let post_id = self.news_store.lock().unwrap().add_news(news);
+
+            let msg = format!(
+                "✅ {} submitted a news entry as post_{}. [{}]",
+                reporter_id, post_id, link
+            );
             self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
                 .await;
 
@@ -999,18 +1121,15 @@ impl Bot {
                     project.name, project.title,
                 ))
                 .unwrap();
-                if regex.is_match(&news.message()) {
-                    self.send_reaction(&format!("{} ?", &project.emoji), &news.event_id)
+                if regex.is_match(&message) {
+                    self.send_reaction(&format!("{} ?", &project.emoji), &event_id)
                         .await;
                 }
             }
-            for section in self.config.sections_by_usual_reporter(&news.reporter_id) {
-                self.send_reaction(&section.emoji, &EventId::parse(&news.event_id).unwrap())
+            for section in self.config.sections_by_usual_reporter(&reporter_id) {
+                self.send_reaction(&section.emoji, &EventId::parse(&event_id).unwrap())
                     .await;
             }
-
-            // Save it in message store
-            self.news_store.lock().unwrap().add_news(news);
         } else {
             let msg = format!(
                 "❌ {}: Your update is too short and was not stored. This limitation was set up to limit spam.",

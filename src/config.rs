@@ -53,6 +53,10 @@ impl Config {
     }
 
     pub fn reaction_type_by_emoji(&self, emoji: &str) -> ReactionType {
+        if let Some(post_id) = utils::parse_post_ref(emoji) {
+            return ReactionType::PostRef(post_id);
+        }
+
         if utils::emoji_cmp(&self.notice_emoji, emoji) {
             return ReactionType::Notice;
         } else {

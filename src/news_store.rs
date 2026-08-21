@@ -31,11 +31,16 @@ impl NewsStore {
         Self { news_map }
     }
 
-    pub fn add_news(&mut self, news: News) {
+    pub fn add_news(&mut self, news: News) -> u32 {
+        let id = self.news_map.values().map(|n| n.id()).max().unwrap_or(0) + 1;
+        news.set_id(id);
+
         debug!("Store {:#?}", &news);
 
         self.news_map.insert(news.event_id.clone(), news);
         self.write_data();
+
+        id
     }
 
     pub fn remove_news(&mut self, event_id: &EventId) -> Result<News, Error> {
@@ -71,6 +76,11 @@ impl NewsStore {
             .find(|&news| news.relates_to_file_id(file_id))
     }
 
+    /// Get news by using its short sequential `post_<id>` reference
+    pub fn news_by_numeric_id(&self, id: u32) -> Option<&News> {
+        self.news_map.values().find(|&news| news.id() == id)
+    }
+
     pub fn find_related_news(&self, reporter_id: &str, timestamp: &DateTime<Utc>) -> Option<&News> {
         let mut shortest_time_diff = None;
         let mut related_news = None;
@@ -99,7 +109,7 @@ impl NewsStore {
         related_news
     }
 
-    /// Wipes all news entries
+    /// Wipes all news entries and resets the `post_<id>` numbering
     pub fn clear_news(&mut self) {
         self.news_map.clear();
         self.write_data();
