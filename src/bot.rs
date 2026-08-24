@@ -1000,7 +1000,7 @@ impl Bot {
                 ))
                 .unwrap();
                 if regex.is_match(&news.message()) {
-                    self.send_reaction(&format!("{} ?", &project.emoji), &news.event_id)
+                    self.send_reaction(&format!("{} ?", project.emoji), &news.event_id)
                         .await;
                 }
             }
