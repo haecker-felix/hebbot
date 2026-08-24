@@ -32,7 +32,7 @@ impl NewsStore {
     }
 
     pub fn add_news(&mut self, news: News) {
-        debug!("Store {:#?}", &news);
+        debug!("Store {:#?}", news);
 
         self.news_map.insert(news.event_id.clone(), news);
         self.write_data();
@@ -40,7 +40,7 @@ impl NewsStore {
 
     pub fn remove_news(&mut self, event_id: &EventId) -> Result<News, Error> {
         if let Some(news) = self.news_map.remove(event_id) {
-            debug!("Removed {:#?}", &news);
+            debug!("Removed {:#?}", news);
             self.write_data();
             return Ok(news);
         }
