@@ -55,6 +55,9 @@ pub trait MessageEventExt {
     ///If this message is an edit, the related event ID.
     fn edited_event_id(&self) -> Option<&EventId>;
 
+    /// If this message is a reply, the event ID it replies to.
+    fn in_reply_to(&self) -> Option<&EventId>;
+
     /// The text of the message, if any.
     fn text(&self, allow_notice: bool) -> Option<&str>;
 
@@ -85,6 +88,14 @@ impl MessageEventExt for OriginalSyncRoomMessageEvent {
     fn edited_event_id(&self) -> Option<&EventId> {
         if let Some(Relation::Replacement(edit)) = &self.content.relates_to {
             Some(&edit.event_id)
+        } else {
+            None
+        }
+    }
+
+    fn in_reply_to(&self) -> Option<&EventId> {
+        if let Some(Relation::Reply { in_reply_to }) = &self.content.relates_to {
+            Some(&in_reply_to.event_id)
         } else {
             None
         }
@@ -168,6 +179,12 @@ pub fn msg_starts_with_mention(user_id: &UserId, display_name: Option<String>, m
     }
 
     false
+}
+
+/// Parses a `post_<n>` reaction key (the fallback for linking media to a
+/// news entry by its short sequential id) into `n`.
+pub fn parse_post_ref(key: &str) -> Option<u32> {
+    key.strip_prefix("post_")?.parse().ok()
 }
 
 /// Returns `true` if the emojis are matching
@@ -313,7 +330,7 @@ mod tests {
     use matrix_sdk::ruma::{EventId, UserId, event_id, user_id};
     use serde_json::json;
 
-    use super::{MessageEventExt, msg_starts_with_mention, remove_bot_name};
+    use super::{MessageEventExt, msg_starts_with_mention, parse_post_ref, remove_bot_name};
 
     static ORIGINAL_EVENT_ID: LazyLock<&'static EventId> = LazyLock::new(|| event_id!("$original"));
     static EDIT_EVENT_ID: LazyLock<&'static EventId> = LazyLock::new(|| event_id!("$edit"));
@@ -344,6 +361,50 @@ mod tests {
             .unwrap();
 
         relations.insert("m.replace".to_owned(), edit);
+    }
+
+    #[test]
+    fn parse_post_ref_works() {
+        assert_eq!(parse_post_ref("post_3"), Some(3));
+        assert_eq!(parse_post_ref("post_42"), Some(42));
+        assert_eq!(parse_post_ref("post_0"), Some(0));
+        assert_eq!(parse_post_ref("post_-3"), None);
+        assert_eq!(parse_post_ref("post_"), None);
+        assert_eq!(parse_post_ref("post_abc"), None);
+        assert_eq!(parse_post_ref("👍"), None);
+        assert_eq!(parse_post_ref("posts_3"), None);
+    }
+
+    #[test]
+    fn message_event_ext_in_reply_to() {
+        let reply_json = room_message_event(
+            &EDIT_EVENT_ID,
+            json!({
+                "msgtype": "m.image",
+                "body": "image.png",
+                "url": "mxc://matrix.local/01234",
+                "m.relates_to": {
+                    "m.in_reply_to": {
+                        "event_id": *ORIGINAL_EVENT_ID,
+                    },
+                },
+            }),
+        );
+
+        let event: OriginalSyncRoomMessageEvent = serde_json::from_value(reply_json).unwrap();
+        assert_eq!(event.in_reply_to(), Some(*ORIGINAL_EVENT_ID));
+
+        // A plain (non-reply) event has no in_reply_to.
+        let plain_json = room_message_event(
+            &ORIGINAL_EVENT_ID,
+            json!({
+                "msgtype": "m.image",
+                "body": "image.png",
+                "url": "mxc://matrix.local/01234",
+            }),
+        );
+        let event: OriginalSyncRoomMessageEvent = serde_json::from_value(plain_json).unwrap();
+        assert_eq!(event.in_reply_to(), None);
     }
 
     #[test]

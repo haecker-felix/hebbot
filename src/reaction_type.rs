@@ -8,6 +8,7 @@ pub enum ReactionType {
     Project(Option<Project>),
     None,
     Notice,
+    PostRef(u32),
 }
 
 impl fmt::Display for ReactionType {
@@ -17,6 +18,7 @@ impl fmt::Display for ReactionType {
             ReactionType::Project(_) => write!(f, "project"),
             ReactionType::None => write!(f, "NONE"),
             ReactionType::Notice => write!(f, "notice"),
+            ReactionType::PostRef(id) => write!(f, "post_{id}"),
         }
     }
 }

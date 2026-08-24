@@ -8,6 +8,10 @@ This room is open to everyone. Here people can share news any time. Editors can 
 
 Those emojis are just an example, you can configure them as you want in the `config.toml` file. 
 
+Normally, an image/video is linked to the news entry from the same person around the same time. If someone else has to upload the media on the reporter's behalf (eg. because the reporter can't upload files themselves), there are two ways to link it correctly:
+- Send the image/video as a reply to the reporter's original message, then react to it as usual.
+- React to the image/video with `post_<id>`, where `<id>` is the entry's short id shown in its submission confirmation and in `!status`. Only editors can use this.
+
 #### "Admin" room
 In this closed room administrative commands can be executed.
 

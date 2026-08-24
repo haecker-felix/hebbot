@@ -15,6 +15,8 @@ pub struct News {
     pub reporter_id: OwnedUserId,
     pub reporter_display_name: String,
     pub timestamp: DateTime<Utc>,
+    #[serde(default)]
+    id: RefCell<u32>,
     message: RefCell<String>,
     section_names: RefCell<HashMap<OwnedEventId, String>>,
     project_names: RefCell<HashMap<OwnedEventId, String>>,
@@ -33,12 +35,21 @@ impl News {
             reporter_id,
             reporter_display_name,
             timestamp: chrono::Utc::now(),
+            id: RefCell::new(0),
             message: RefCell::new(message),
             section_names: RefCell::default(),
             project_names: RefCell::default(),
             images: RefCell::default(),
             videos: RefCell::default(),
         }
+    }
+
+    pub fn id(&self) -> u32 {
+        *self.id.borrow()
+    }
+
+    pub fn set_id(&self, id: u32) {
+        *self.id.borrow_mut() = id;
     }
 
     pub fn message(&self) -> String {
