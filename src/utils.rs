@@ -241,8 +241,11 @@ fn display_name_mention_regex(display_name: Option<String>) -> Option<Regex> {
 
 /// Remove bot name from message
 pub fn remove_bot_name(user_id: &UserId, display_name: Option<String>, msg: &str) -> String {
+    // Trim leading whitespace
+    let mut msg = msg.trim_start().to_string();
+
     // Remove user ID.
-    let mut msg = user_id_mention_regex(user_id).replace(msg, "").to_string();
+    msg = user_id_mention_regex(user_id).replace(&msg, "").to_string();
 
     // Remove display name.
     if let Some(display_name_mention_regex) = display_name_mention_regex(display_name) {
