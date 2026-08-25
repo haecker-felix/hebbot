@@ -865,6 +865,17 @@ impl Bot {
             self.send_message(&notes, BotMsgType::AdminRoomHtmlNotice)
                 .await;
         }
+
+        // Clean up the temp folder
+        if let Err(error) = rendered_folder.close() {
+            let msg = format!(
+                "❌ Could not remove the temporary folder used while generating the tar.gz: <pre>{}</pre>",
+                error
+            );
+            self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+                .await;
+            return;
+        }
     }
 
     async fn restart_command(&self) {
