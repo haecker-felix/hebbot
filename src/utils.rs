@@ -158,6 +158,9 @@ pub fn as_message_event(
 /// - May start with `@`.
 /// - May include the server name.
 pub fn msg_starts_with_mention(user_id: &UserId, display_name: Option<String>, msg: &str) -> bool {
+    // Trim leading whitespace
+    let msg = msg.trim_start();
+
     // Catch messages that start with the user ID.
     if user_id_mention_regex(user_id).is_match(msg) {
         return true;
