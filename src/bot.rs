@@ -844,7 +844,7 @@ impl Bot {
             )
             .await;
 
-            let mut curl_command = "curl -H 'Authorization: Bearer \<access token\>'".to_string();
+            let mut curl_command = r"curl -H 'Authorization: Bearer <access token>'".to_string();
             for (filename, uri) in &files {
                 if uri.is_valid() {
                     let url = format!(
