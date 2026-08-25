@@ -671,8 +671,20 @@ mod tests {
             assert_eq!(remove_bot_name(uppercase_user_id, None, &message), content);
         }
 
-        let matching_display_name_prefixes =
-            &["the hebbot: ", "THE HEBBOT: ", "the hebbot ", "THE HEBBOT "];
+        let matching_display_name_prefixes = &[
+            "the hebbot: ",
+            "THE HEBBOT: ",
+            "the hebbot ",
+            "THE HEBBOT ",
+            "\nthe hebbot: ",
+            " the hebbot: ",
+            "\nTHE HEBBOT: ",
+            " THE HEBBOT: ",
+            "\nthe hebbot ",
+            "\nTHE HEBBOT ",
+            " the hebbot ",
+            " THE HEBBOT ",
+        ];
 
         for prefix in matching_display_name_prefixes {
             let message = format!("{prefix}{content}");
