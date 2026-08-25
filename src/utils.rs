@@ -1,4 +1,6 @@
 use async_process::{Command, Stdio};
+use flate2::Compression;
+use flate2::write::GzEncoder;
 use matrix_sdk::deserialized_responses::TimelineEventKind;
 use matrix_sdk::room::Room;
 use matrix_sdk::ruma::events::room::message::{
@@ -14,6 +16,7 @@ use regex::Regex;
 use std::fmt::Write;
 use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 use std::sync::{LazyLock, Mutex, OnceLock};
 use std::{env, str};
 
@@ -306,6 +309,14 @@ pub fn file_from_env(env_var_name: &str, fallback: &str) -> String {
         .expect("Unable to read file");
 
     template
+}
+
+pub fn package_tar_gz(tar_gz: &mut Vec<u8>, rendered_files: &Path) -> Result<(), std::io::Error> {
+    let enc = GzEncoder::new(tar_gz, Compression::default());
+    let mut tar = tar::Builder::new(enc);
+    tar.append_dir_all("", rendered_files)?;
+    tar.finish()?;
+    Ok(())
 }
 
 #[cfg(test)]

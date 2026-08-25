@@ -15,6 +15,7 @@ use matrix_sdk::ruma::{EventId, OwnedMxcUri, RoomId, ServerName, UserId};
 use matrix_sdk::{Client, Room, RoomState};
 
 use regex::Regex;
+use tempfile::tempdir;
 
 use std::env;
 use std::fmt::Write;
@@ -22,7 +23,7 @@ use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 
-use crate::utils::MessageEventExt;
+use crate::utils::{MessageEventExt, package_tar_gz};
 use crate::{BotMessageType as BotMsgType, Config, News, NewsStore, ReactionType, render, utils};
 
 #[derive(Clone)]
@@ -790,13 +791,30 @@ impl Bot {
     }
 
     async fn render_command(&self, editor: &RoomMember) {
+        // Create a temporary folder to put all files into
+        let rendered_folder = match tempdir() {
+            Ok(tempfolder) => tempfolder,
+            Err(error) => {
+                let msg = format!(
+                    "❌ Could not create temporary folder for rendering: <pre>{}</pre>",
+                    error
+                );
+                self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+                    .await;
+                return;
+            }
+        };
         let result = {
-            let news_store = self.news_store.lock().unwrap();
-            let news = news_store.news();
+            let news = {
+                let news_store = self.news_store.lock().unwrap();
+                news_store.news()
+            };
+
             let config = self.config.clone();
 
-            render::render(news, config, editor)
+            render::render(news, config, editor, &self.client, rendered_folder.path()).await
         };
+
         let result = match result {
             Ok(result) => result,
             Err(error) => {
@@ -807,17 +825,31 @@ impl Bot {
             }
         };
 
-        // Upload rendered content as markdown file
-        let bytes = result.rendered.into_bytes();
+        let mut tar_data = Vec::new();
+        if let Err(error) = package_tar_gz(&mut tar_data, rendered_folder.path()) {
+            let msg = format!(
+                "❌ Could not package rendered post as tar.gz: <pre>{}</pre>",
+                error
+            );
+            self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
+                .await;
+            return;
+        }
+
+        // Upload rendered content
         let response = self
             .client
             .media()
-            .upload(&mime::TEXT_PLAIN_UTF_8, bytes, None)
+            .upload(
+                &"application/gzip".parse::<mime::Mime>().unwrap(),
+                tar_data,
+                None,
+            )
             .await
             .expect("Can't upload rendered file.");
 
         // Send file
-        self.send_file(response.content_uri, "rendered.md".to_string(), true)
+        self.send_file(response.content_uri, "rendered.tar.gz".to_string(), true)
             .await;
 
         // Send warnings
@@ -831,35 +863,6 @@ impl Bot {
         let notes = utils::format_messages(false, &result.notes);
         if !result.notes.is_empty() {
             self.send_message(&notes, BotMsgType::AdminRoomHtmlNotice)
-                .await;
-        }
-
-        // Generate a curl command which can get used to download all files (images/videos).
-        let mut files = result.images.clone();
-        files.append(&mut result.videos.clone());
-        if !files.is_empty() {
-            self.send_message(
-                "Use this command to download all files:",
-                BotMsgType::AdminRoomHtmlNotice,
-            )
-            .await;
-
-            let mut curl_command = r"curl -H 'Authorization: Bearer <access token>'".to_string();
-            for (filename, uri) in &files {
-                if uri.is_valid() {
-                    let url = format!(
-                        "{}_matrix/client/v1/media/download/{}/{}",
-                        self.client.homeserver(),
-                        uri.server_name().unwrap(),
-                        uri.media_id().unwrap()
-                    );
-
-                    write!(curl_command, " {} -o '{}'", url, filename).unwrap();
-                }
-            }
-
-            let msg = format!("<pre><code>{}</code></pre>\n", curl_command);
-            self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
                 .await;
         }
     }
