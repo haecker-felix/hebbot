@@ -1,7 +1,7 @@
 # hebbot
 
 [![](https://img.shields.io/github/v/release/haecker-felix/hebbot)](https://github.com/haecker-felix/hebbot/releases)
-[![](https://img.shields.io/badge/matrix-%23hebbot%3Ahaecker.io-lightgrey)](https://matrix.to/#/#hebbot:matrix.org)
+[![](https://img.shields.io/badge/matrix-%23hebbot%3Amatrix.org-lightgrey)](https://matrix.to/#/#hebbot:matrix.org)
 [![]( https://img.shields.io/github/actions/workflow/status/haecker-felix/hebbot/build.yml)](https://github.com/haecker-felix/hebbot/actions)
 
 A [Matrix](matrix.org) bot which can help to generate periodic / recurrent summary blog posts (also known as "This Week in X").
