@@ -874,7 +874,6 @@ impl Bot {
             );
             self.send_message(&msg, BotMsgType::AdminRoomHtmlNotice)
                 .await;
-            return;
         }
     }
 
