@@ -168,7 +168,7 @@ pub async fn render(
                 Ok(bytes) => bytes,
                 Err(error) => {
                     warnings.push(format!(
-                        "File \"{filename}\" with the MXC \"{}\" couldnt be downloaded: <pre>{error}</pre>", mxc.as_str()
+                        "File \"{filename}\" with the MXC \"{}\" couldn't be downloaded: <pre>{error}</pre>", mxc.as_str()
                     ));
                     continue;
                 }
@@ -196,7 +196,7 @@ pub async fn render(
                 Ok(bytes) => bytes,
                 Err(error) => {
                     warnings.push(format!(
-                        "File \"{filename}\" with the MXC \"{}\" couldnt be downloaded: <pre>{error}</pre>", mxc.as_str()
+                        "File \"{filename}\" with the MXC \"{}\" couldn't be downloaded: <pre>{error}</pre>", mxc.as_str()
                     ));
                     continue;
                 }
