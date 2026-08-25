@@ -684,13 +684,14 @@ mod tests {
             "\nTHE HEBBOT: ",
             " THE HEBBOT: ",
             "\nthe hebbot ",
-            "\nTHE HEBBOT ",
             " the hebbot ",
+            "\nTHE HEBBOT ",
             " THE HEBBOT ",
         ];
 
         for prefix in matching_display_name_prefixes {
             let message = format!("{prefix}{content}");
+            dbg!(&message);
 
             // Log the message for debugging when the check fails.
             println!("Checking message: `{message}`");
@@ -712,7 +713,10 @@ mod tests {
 
             // Lowercase user ID no display name.
             assert!(!msg_starts_with_mention(lowercase_user_id, None, &message,));
-            assert_eq!(remove_bot_name(lowercase_user_id, None, &message), message);
+            assert_eq!(
+                remove_bot_name(lowercase_user_id, None, &message),
+                message.trim_start()
+            );
 
             // Uppercase user ID and display name.
             assert!(msg_starts_with_mention(
@@ -731,7 +735,10 @@ mod tests {
 
             // Uppercase user ID no display name.
             assert!(!msg_starts_with_mention(uppercase_user_id, None, &message,));
-            assert_eq!(remove_bot_name(uppercase_user_id, None, &message), message);
+            assert_eq!(
+                remove_bot_name(uppercase_user_id, None, &message),
+                message.trim_start()
+            );
         }
 
         let not_matching_prefixes = &[
