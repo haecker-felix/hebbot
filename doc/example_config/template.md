@@ -48,7 +48,7 @@ draft: false
 {%- macro news(news_items) -%}
   {%- for item in news_items %}
 
-[{{ item.reporter_display_name }}](https://matrix.to/#{{ item.reporter_id }}) {{ config.verbs | random }}
+[{{ item.reporter_display_name }}](https://matrix.to/#/{{ item.reporter_id }}) {{ config.verbs | random }}
 
 > {{ item.message | replace("\n", "\n> ") }}
     {%- if item.images -%}
