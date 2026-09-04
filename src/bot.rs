@@ -854,7 +854,7 @@ impl Bot {
                         uri.media_id().unwrap()
                     );
 
-                    write!(curl_command, " {} -o {}", url, filename).unwrap();
+                    write!(curl_command, " {} -o '{}'", url, filename).unwrap();
                 }
             }
 
