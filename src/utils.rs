@@ -158,6 +158,9 @@ pub fn as_message_event(
 /// - May start with `@`.
 /// - May include the server name.
 pub fn msg_starts_with_mention(user_id: &UserId, display_name: Option<String>, msg: &str) -> bool {
+    // Trim leading whitespace
+    let msg = msg.trim_start();
+
     // Catch messages that start with the user ID.
     if user_id_mention_regex(user_id).is_match(msg) {
         return true;
@@ -241,8 +244,11 @@ fn display_name_mention_regex(display_name: Option<String>) -> Option<Regex> {
 
 /// Remove bot name from message
 pub fn remove_bot_name(user_id: &UserId, display_name: Option<String>, msg: &str) -> String {
+    // Trim leading whitespace
+    let mut msg = msg.trim_start().to_string();
+
     // Remove user ID.
-    let mut msg = user_id_mention_regex(user_id).replace(msg, "").to_string();
+    msg = user_id_mention_regex(user_id).replace(&msg, "").to_string();
 
     // Remove display name.
     if let Some(display_name_mention_regex) = display_name_mention_regex(display_name) {
@@ -668,11 +674,24 @@ mod tests {
             assert_eq!(remove_bot_name(uppercase_user_id, None, &message), content);
         }
 
-        let matching_display_name_prefixes =
-            &["the hebbot: ", "THE HEBBOT: ", "the hebbot ", "THE HEBBOT "];
+        let matching_display_name_prefixes = &[
+            "the hebbot: ",
+            "THE HEBBOT: ",
+            "the hebbot ",
+            "THE HEBBOT ",
+            "\nthe hebbot: ",
+            " the hebbot: ",
+            "\nTHE HEBBOT: ",
+            " THE HEBBOT: ",
+            "\nthe hebbot ",
+            " the hebbot ",
+            "\nTHE HEBBOT ",
+            " THE HEBBOT ",
+        ];
 
         for prefix in matching_display_name_prefixes {
             let message = format!("{prefix}{content}");
+            dbg!(&message);
 
             // Log the message for debugging when the check fails.
             println!("Checking message: `{message}`");
@@ -694,7 +713,10 @@ mod tests {
 
             // Lowercase user ID no display name.
             assert!(!msg_starts_with_mention(lowercase_user_id, None, &message,));
-            assert_eq!(remove_bot_name(lowercase_user_id, None, &message), message);
+            assert_eq!(
+                remove_bot_name(lowercase_user_id, None, &message),
+                message.trim_start()
+            );
 
             // Uppercase user ID and display name.
             assert!(msg_starts_with_mention(
@@ -713,7 +735,10 @@ mod tests {
 
             // Uppercase user ID no display name.
             assert!(!msg_starts_with_mention(uppercase_user_id, None, &message,));
-            assert_eq!(remove_bot_name(uppercase_user_id, None, &message), message);
+            assert_eq!(
+                remove_bot_name(uppercase_user_id, None, &message),
+                message.trim_start()
+            );
         }
 
         let not_matching_prefixes = &[
