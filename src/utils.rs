@@ -151,7 +151,7 @@ pub fn as_message_event(
 /// The mention:
 ///
 /// - Is case-insensitive.
-/// - May be followed by `:`.
+/// - Must be followed by a non-word character, e.g. `:` or whitespace.
 ///
 /// And for the user ID:
 ///
@@ -187,7 +187,7 @@ pub fn emoji_cmp(a: &str, b: &str) -> bool {
 /// - Is case-insensitive.
 /// - May start with `@`.
 /// - May include the server name.
-/// - May be followed by `:`.
+/// - Must be followed by a non-word character, e.g. `:` or whitespace.
 fn user_id_mention_regex(user_id: &UserId) -> &'static Regex {
     // The bot's user ID will never change as long as the bot is running, so we compile it only
     // the first time and store it in a `OnceLock`.
@@ -196,7 +196,7 @@ fn user_id_mention_regex(user_id: &UserId) -> &'static Regex {
         let escaped_server_name = regex::escape(user_id.server_name().as_str());
 
         Regex::new(&format!(
-            "(?i)^@?{escaped_localpart}(:{escaped_server_name})?:?"
+            "(?i)^@?{escaped_localpart}(:{escaped_server_name})?\\W"
         ))
         .unwrap()
     })
@@ -207,7 +207,7 @@ fn user_id_mention_regex(user_id: &UserId) -> &'static Regex {
 /// The mention:
 ///
 /// - Is case-insensitive.
-/// - May be followed by `:`.
+/// - Must be followed by a non-word character, e.g. `:` or whitespace.
 fn display_name_mention_regex(display_name: Option<String>) -> Option<Regex> {
     // The bot's display name might change when the bot is running, so we store it in a `Mutex`
     // and replace it when it is invalidated.
@@ -225,7 +225,7 @@ fn display_name_mention_regex(display_name: Option<String>) -> Option<Regex> {
         } else {
             // We don't have a regex or it is invalid, compile a new regex.
             let escaped_display_name = regex::escape(&display_name);
-            let regex = Regex::new(&format!("(?i)^{escaped_display_name}:?")).unwrap();
+            let regex = Regex::new(&format!("(?i)^{escaped_display_name}\\W")).unwrap();
 
             *cached_regex = Some(CachedRegex {
                 key: display_name,
@@ -627,6 +627,8 @@ mod tests {
             "@HEBBOT ",
             "@hebbot:matrix.local ",
             "@HEBBOT:matrix.local ",
+            "hebbot\n\n",
+            "HEBBOT\n\n",
         ];
 
         for prefix in matching_localpart_prefixes {
@@ -749,6 +751,9 @@ mod tests {
             "[THE HEBBOT] ",
             "heb bot ",
             "@the hebbot",
+            "hebbotterino ",
+            "hebbotterino: ",
+            "@hebbotterino ",
         ];
 
         for prefix in not_matching_prefixes {
