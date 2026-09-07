@@ -894,7 +894,7 @@ impl Bot {
                     assigned_count += 1;
                     write!(
                         assigned_list,
-                        "- [{}] {}: {} <br>",
+                        "<li>[{}] {}: {}</li>",
                         link, n.reporter_id, summary
                     )
                     .unwrap();
@@ -902,7 +902,7 @@ impl Bot {
                     unassigned_count += 1;
                     write!(
                         unassigned_list,
-                        "- [{}] {}: {} <br>",
+                        "<li>[{}] {}: {}<li>",
                         link, n.reporter_id, summary
                     )
                     .unwrap();
@@ -910,10 +910,9 @@ impl Bot {
             }
 
             format!(
-                "{} news entries in total <br><br>\
-                ✅ Assigned news entries: ({}): <br>{} <br>\
-                ❌ Unassigned / ignored news entries ({}): <br>{}",
-                sum, assigned_count, assigned_list, unassigned_count, unassigned_list
+                "{sum} news entries in total <br><br>
+                ✅ Assigned news entries: ({assigned_count}): <ul>{assigned_list}</ul>\
+                ❌ Unassigned / ignored news entries ({unassigned_count}): <br>{unassigned_list}",
             )
         };
 
