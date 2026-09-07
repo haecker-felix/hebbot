@@ -1,9 +1,12 @@
 use chrono::{DateTime, Utc};
+use matrix_sdk::media::{MediaFormat, MediaRequestParameters};
 use matrix_sdk::room::RoomMember;
+use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::{EventId, OwnedMxcUri, OwnedUserId};
 use serde::{Deserialize, Serialize};
 
 use std::collections::{BTreeMap, HashSet};
+use std::path::Path;
 use std::sync::LazyLock;
 
 use crate::{Config, News, Project, Section};
@@ -50,11 +53,8 @@ struct RenderSection {
 }
 
 pub struct RenderResult {
-    pub rendered: String,
     pub warnings: Vec<String>,
     pub notes: Vec<String>,
-    pub images: Vec<(String, OwnedMxcUri)>,
-    pub videos: Vec<(String, OwnedMxcUri)>,
 }
 
 fn template_filter_timedelta(
@@ -113,10 +113,12 @@ static JINJA_ENV: LazyLock<minijinja::Environment> = LazyLock::new(|| {
     env
 });
 
-pub fn render(
+pub async fn render(
     news_list: Vec<News>,
     config: Config,
     editor: &RoomMember,
+    client: &matrix_sdk::Client,
+    output_path: &Path,
 ) -> Result<RenderResult, minijinja::Error> {
     let mut render_projects: BTreeMap<String, RenderProject> = BTreeMap::new();
     let mut render_sections: BTreeMap<String, RenderSection> = BTreeMap::new();
@@ -125,8 +127,8 @@ pub fn render(
     let mut not_assigned = 0;
     let mut project_names: HashSet<String> = HashSet::new();
 
-    let mut images: Vec<(String, OwnedMxcUri)> = Vec::new();
-    let mut videos: Vec<(String, OwnedMxcUri)> = Vec::new();
+    let mut video_count = 0;
+    let mut image_count = 0;
 
     let mut warnings: Vec<String> = Vec::new();
     let mut notes: Vec<String> = Vec::new();
@@ -156,8 +158,62 @@ pub fn render(
         news_count += 1;
 
         // Get news images / videos
-        images.append(&mut news.images());
-        videos.append(&mut news.videos());
+        for (filename, mxc) in news.images() {
+            // Fetch media
+            let request = MediaRequestParameters {
+                source: MediaSource::Plain(mxc.clone()),
+                format: MediaFormat::File,
+            };
+            let bytes = match client.media().get_media_content(&request, false).await {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    warnings.push(format!(
+                        "File \"{filename}\" with the MXC \"{}\" couldn't be downloaded: <pre>{error}</pre>", mxc.as_str()
+                    ));
+                    continue;
+                }
+            };
+
+            // Write media to the correct file in the output folder
+            let media_file = output_path.join(&filename);
+            if let Err(error) = std::fs::write(&media_file, bytes) {
+                let note = format!(
+                    "Failed to write the image {} to the temporary folder for packaging: <pre>{}</pre>",
+                    filename, error
+                );
+                warnings.push(note);
+            }
+
+            image_count += 1;
+        }
+        for (filename, mxc) in news.videos() {
+            // Fetch media
+            let request = MediaRequestParameters {
+                source: MediaSource::Plain(mxc.clone()),
+                format: MediaFormat::File,
+            };
+            let bytes = match client.media().get_media_content(&request, false).await {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    warnings.push(format!(
+                        "File \"{filename}\" with the MXC \"{}\" couldn't be downloaded: <pre>{error}</pre>", mxc.as_str()
+                    ));
+                    continue;
+                }
+            };
+
+            // Write media to the correct file in the output folder
+            let media_file = output_path.join(&filename);
+            if let Err(error) = std::fs::write(&media_file, bytes) {
+                let note = format!(
+                    "Failed to write the video {} to the temporary folder for packaging: <pre>{}</pre>",
+                    filename, error
+                );
+                warnings.push(note);
+            }
+
+            video_count += 1;
+        }
 
         // Add news entries without any project information (but with section information) directly to the specified `RenderSection`
         if news.project_names().is_empty() {
@@ -283,9 +339,7 @@ pub fn render(
 
     let summary = format!(
         "Rendered markdown is including {} news, {} image(s) and {} video(s)!",
-        news_count,
-        images.len(),
-        videos.len(),
+        news_count, image_count, video_count,
     );
     notes.push(summary);
 
@@ -299,13 +353,17 @@ pub fn render(
             editor => editor.name(),
         })?;
 
-    Ok(RenderResult {
-        rendered,
-        warnings,
-        notes,
-        images,
-        videos,
-    })
+    // Write the markdown file to the output folder
+    let markdown_file = output_path.join("rendered.md");
+    if let Err(error) = std::fs::write(&markdown_file, rendered.into_bytes()) {
+        let note = format!(
+            "Failed to write the rendered.md to the temporary folder for packaging: <pre>{}</pre>",
+            error
+        );
+        warnings.push(note);
+    }
+
+    Ok(RenderResult { warnings, notes })
 }
 
 fn message_link(config: &Config, event_id: &EventId) -> String {
